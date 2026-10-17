@@ -1,0 +1,1087 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NozzleLab">
+<title>NozzleLab · CD Nozzle Test Section</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!--
+  ============================================================================
+  PWA NOTES
+  * Files that make the app installable: index.html, manifest.json, sw.js,
+    icon-192.png, icon-512.png  (all in the same GitHub Pages folder).
+  * Bump CACHE in sw.js (v1 -> v2 ...) whenever you upload a new version.
+  ============================================================================
+-->
+<style>
+:root{
+  --bg:#0a0e14; --panel:#10161f; --panel2:#151d29; --line:#243042;
+  --txt:#d6e2f0; --dim:#7f93aa; --acc:#4cc9f0; --acc2:#ffb347; --bad:#ff6b6b;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+  font:13px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;
+  overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+#app{display:flex;height:100%;width:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+/* ---------- control panel (left) ---------- */
+#panel{flex:0 0 clamp(236px,26vw,300px);background:var(--panel);border-right:1px solid var(--line);
+  overflow-y:auto;padding:10px 12px 18px;display:block;-webkit-overflow-scrolling:touch}
+#panel.hidden{display:none}
+#panel h1{font-size:15px;margin:0 0 2px;letter-spacing:.04em}
+#panel h1 span{color:var(--acc)}
+#panel .sub{color:var(--dim);font-size:11px;margin-bottom:8px}
+.sec{border-top:1px solid var(--line);padding:8px 0 4px;margin-top:6px}
+.sec>h2{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:0 0 6px;font-weight:600}
+label{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0 2px;color:var(--txt)}
+label b{color:var(--acc);font-variant-numeric:tabular-nums;font-weight:600}
+select,button{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+  border-radius:6px;padding:6px 8px;font:inherit}
+select:focus,button:focus-visible,input:focus-visible{outline:1px solid var(--acc)}
+button{cursor:pointer;touch-action:manipulation}
+button:active{background:#1d2a3b}
+button:disabled{opacity:.45}
+input[type=range]{width:100%;margin:2px 0 4px;accent-color:var(--acc);height:22px}
+input[type=range]:disabled{opacity:.4}
+.row{display:flex;gap:6px;margin-top:5px}
+.row>button{padding:5px 2px;font-size:12px}
+.row>button.on{border-color:var(--acc);color:var(--acc)}
+.chk{display:flex;align-items:center;gap:8px;justify-content:flex-start;margin:4px 0;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--acc)}
+#install{display:none;border-color:var(--acc);color:var(--acc)}
+.note{color:var(--dim);font-size:10.5px;margin-top:6px}
+/* ---------- stage (right) ---------- */
+#stage{position:relative;flex:1;min-width:0;background:#090d13;overflow:hidden}
+#stage canvas.fill{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
+#trail{touch-action:none;cursor:default}
+#trail.drag{cursor:ns-resize}
+.sbtn{position:absolute;top:8px;width:38px;height:34px;padding:0;font-size:16px;
+  background:rgba(16,22,31,.82);backdrop-filter:blur(4px);z-index:5}
+#menuBtn{left:8px} #hudBtn{left:52px} #plotBtn{left:96px}
+#hud{position:absolute;right:8px;top:8px;z-index:4;min-width:218px;max-width:270px;
+  background:rgba(12,17,25,.8);backdrop-filter:blur(6px);border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none}
+#hud.off{display:none}
+#hud .g{display:grid;grid-template-columns:auto 1fr;gap:0 10px}
+#hud .g3{display:grid;grid-template-columns:auto 1fr 1fr;gap:0 8px}
+#hud .k{color:var(--dim)} #hud .v{text-align:right;color:var(--txt);font-variant-numeric:tabular-nums}
+#hud .v.big{color:var(--acc);font-weight:700}
+#hud .v.th{color:var(--acc2)}
+#hud .v.hd{color:var(--dim);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+#hud hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+#hud .tag{color:var(--dim);font-size:10.5px;line-height:1.3;margin-top:3px}
+#hud .reg{color:var(--acc);font-size:11px;line-height:1.3;margin-top:2px;font-weight:600}
+#legend{position:absolute;left:8px;bottom:8px;z-index:4;background:rgba(12,17,25,.8);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:8px;padding:5px 8px;pointer-events:none;font:11px ui-monospace,Menlo,Consolas,monospace}
+#legend canvas{position:static;width:150px;height:10px;display:block;border-radius:3px;margin:3px 0}
+#legend .lb{display:flex;justify-content:space-between;color:var(--dim)}
+#plotWrap{position:absolute;right:8px;bottom:8px;z-index:4;background:rgba(12,17,25,.8);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:8px;padding:4px;display:none}
+#plotWrap.on{display:block}
+#plot{display:block;width:260px;height:112px;cursor:pointer}
+#hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:4;pointer-events:none;
+  background:rgba(12,17,25,.8);border:1px solid var(--line);border-radius:20px;padding:5px 14px;color:var(--dim);
+  transition:opacity 1s;font-size:12px;white-space:nowrap}
+/* ---------- portrait helper ---------- */
+#rotate{display:none;position:fixed;inset:0;z-index:50;background:rgba(6,9,14,.96);align-items:center;justify-content:center;
+  flex-direction:column;text-align:center;padding:30px;gap:14px}
+#rotate .ic{font-size:54px;animation:rot 2.4s ease-in-out infinite}
+#rotate button{width:auto;padding:8px 18px}
+@keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (max-width:820px){ #rotate.on{display:flex} }
+@media (max-height:430px){
+  #hud{font-size:10.5px;padding:5px 8px;min-width:200px} #panel{padding:6px 10px 12px}
+  .sec{padding-top:5px;margin-top:4px}
+  #plot{width:230px;height:96px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <h1>NOZZLE<span>LAB</span> · Test Section</h1>
+    <div class="sub">2D converging-diverging nozzle · compressible Euler CFD</div>
+
+    <div class="sec">
+      <h2>Nozzle</h2>
+      <select id="ntype">
+        <option value="conical">Conical (straight cone)</option>
+        <option value="bell" selected>Bell (parabolic)</option>
+        <option value="scurve">Contoured S-curve (smooth)</option>
+        <option value="dual">Dual-bell</option>
+        <option value="conv">Convergent only (sonic exit)</option>
+      </select>
+      <label>Area ratio A<sub>e</sub>/A<sub>t</sub> <b id="arV">3.00</b></label>
+      <input id="ar" type="range" min="1" max="5" step="0.05" value="3">
+      <div class="row"><button data-ar="1.5">1.5</button><button data-ar="2">2</button><button data-ar="3">3</button><button data-ar="4">4</button><button data-ar="5">5</button></div>
+      <label>Throat width <b id="wtV">50 mm</b></label>
+      <input id="wt" type="range" min="10" max="300" step="5" value="50">
+      <div class="note">Tip: drag the exit lip up/down in the viewport to change the area ratio.</div>
+    </div>
+
+    <div class="sec">
+      <h2>Flow conditions</h2>
+      <label>Gas</label>
+      <select id="gas">
+        <option value="air" selected>Air (γ = 1.40)</option>
+        <option value="steam">Steam (γ = 1.33)</option>
+        <option value="co2">CO₂ (γ = 1.29)</option>
+        <option value="comb">Rocket exhaust (γ = 1.20)</option>
+        <option value="he">Helium (γ = 1.67)</option>
+      </select>
+      <label>Stagnation pressure p₀ <b id="p0V">500 kPa</b></label>
+      <input id="p0" type="range" min="100" max="3000" step="50" value="500">
+      <label>Stagnation temperature T₀ <b id="T0V">600 K</b></label>
+      <input id="T0" type="range" min="250" max="3500" step="50" value="600">
+      <label>Pressure ratio NPR = p₀/p<sub>b</sub> <b id="nprV">–</b></label>
+      <input id="npr" type="range" min="0" max="1000" step="1" value="500">
+      <div class="row"><button data-reg="sub">Subsonic</button><button data-reg="shock">Shock in nozzle</button></div>
+      <div class="row"><button data-reg="over">Over-exp.</button><button data-reg="design">Design</button><button data-reg="under">Under-exp.</button></div>
+      <div class="note" id="nprNote"></div>
+    </div>
+
+    <div class="sec">
+      <h2>Visualisation</h2>
+      <label>Field overlay</label>
+      <select id="field">
+        <option value="mach" selected>Mach number</option>
+        <option value="pressure">Static pressure p/p₀</option>
+        <option value="temp">Temperature T/T₀</option>
+        <option value="density">Density ρ/ρ₀</option>
+        <option value="velocity">Velocity (m/s)</option>
+        <option value="schlieren">Schlieren (shocks)</option>
+        <option value="none">None</option>
+      </select>
+      <label>Tracers</label>
+      <select id="tracer">
+        <option value="smoke" selected>Smoke lines</option>
+        <option value="path">Particle pathlines</option>
+        <option value="off">Off</option>
+      </select>
+      <label class="chk"><input id="sonic" type="checkbox" checked> Sonic line (M = 1)</label>
+      <label class="chk"><input id="theory" type="checkbox" checked> 1-D theory markers</label>
+      <label class="chk"><input id="stream" type="checkbox"> Streamlines</label>
+      <label class="chk"><input id="vec" type="checkbox"> Velocity vectors</label>
+    </div>
+
+    <div class="sec">
+      <h2>Solver / performance</h2>
+      <label>Quality</label>
+      <select id="quality">
+        <option value="auto" selected>Auto (hold 60 FPS)</option>
+        <option value="0">Low</option><option value="1">Medium</option>
+        <option value="2">High</option><option value="3">Ultra</option>
+      </select>
+      <label class="chk"><input id="order2" type="checkbox"> 2nd-order shock capturing</label>
+      <div class="row"><button id="pause">⏸ Pause</button><button id="reset">↺ Restart flow</button></div>
+      <div class="row"><button id="full">⛶ Fullscreen</button><button id="install">⬇ Install app</button></div>
+    </div>
+    <div class="note">Teaching-grade solver: body-fitted grid, inviscid (no boundary layer / separation), ambient gas at T₀. Compare the sim with the 1-D isentropic theory shown in orange.</div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="base" class="fill"></canvas>
+    <canvas id="trail" class="fill"></canvas>
+    <button id="menuBtn" class="sbtn" title="Toggle controls">☰</button>
+    <button id="hudBtn" class="sbtn" title="Toggle readouts">📋</button>
+    <button id="plotBtn" class="sbtn" title="Toggle centreline plot">📈</button>
+    <div id="hud">
+      <div class="g">
+        <span class="k">NPR p₀/p<sub>b</sub></span><span class="v big" id="hNpr">–</span>
+        <span class="k">p₀ · p<sub>b</sub></span><span class="v" id="hP">–</span>
+        <span class="k">T₀ · gas</span><span class="v" id="hT">–</span>
+      </div><hr>
+      <div class="g3">
+        <span></span><span class="v hd">sim</span><span class="v hd">theory</span>
+        <span class="k">M throat</span><span class="v big" id="sMt">–</span><span class="v th" id="tMt">–</span>
+        <span class="k">M exit</span><span class="v big" id="sMe">–</span><span class="v th" id="tMe">–</span>
+        <span class="k">V exit</span><span class="v" id="sVe">–</span><span class="v th" id="tVe">–</span>
+        <span class="k">ṁ /m</span><span class="v" id="sMd">–</span><span class="v th" id="tMd">–</span>
+        <span class="k">F /m</span><span class="v" id="sF">–</span><span class="v th" id="tF">–</span>
+        <span class="k">C<sub>F</sub></span><span class="v" id="sCf">–</span><span class="v th" id="tCf">–</span>
+      </div><hr>
+      <div class="reg" id="hReg">–</div>
+      <div class="tag" id="hCrit">–</div>
+      <div class="tag" id="hGrid">–</div>
+    </div>
+    <div id="legend"><div id="lgTitle">Mach</div><canvas id="lgBar" width="128" height="1"></canvas><div class="lb"><span id="lgA"></span><span id="lgB"></span><span id="lgC"></span></div></div>
+    <div id="plotWrap"><canvas id="plot"></canvas></div>
+    <div id="hint">Drag the nozzle exit lip to change area ratio · ↑/↓ NPR · ←/→ area ratio · Space pauses</div>
+  </main>
+</div>
+
+<div id="rotate" class="on">
+  <div class="ic">📱</div>
+  <div><b>Rotate to landscape</b><br><span style="color:var(--dim)">The nozzle test section is designed for a wide screen.</span></div>
+  <button id="rotOk">Continue anyway</button>
+</div>
+
+<script>
+'use strict';
+/* =============================================================================
+   NozzleLab - 2D converging-diverging (CD) nozzle test section
+   Solver : 2-D compressible Euler equations on a body-fitted structured grid
+            (vertical grid lines follow the nozzle wall), cell-centred finite
+            volume, Rusanov flux with Thornber low-Mach correction, MUSCL-minmod
+            2nd order, SSP-RK2. Same scheme family as AeroLab's Euler solver.
+   Domain : [ reservoir | converging | THROAT | diverging ] [ open test chamber ]
+   BCs    : inlet = stagnation reservoir (p0,T0), walls = mirror slip,
+            sides/outlet = ambient at p_b.
+   Units  : rho_ref = rho0, a_ref = a0; stagnation state rho=1, p=1/gamma, T=1.
+            Length unit = throat half-height.
+   Theory : quasi-1-D isentropic flow + normal shock (area-Mach relation).
+   ============================================================================= */
+const PI = Math.PI;
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+const GASES = {
+  air: { name: 'Air', g: 1.4, R: 287.0 }, steam: { name: 'Steam', g: 1.33, R: 461.5 }, co2: { name: 'CO2', g: 1.29, R: 188.9 },
+  comb: { name: 'Rocket exhaust', g: 1.2, R: 350.0 }, he: { name: 'Helium', g: 5 / 3, R: 2077.0 }
+};
+const AoverAstar = (M, g) => Math.pow((2 / (g + 1)) * (1 + 0.5 * (g - 1) * M * M), (g + 1) / (2 * (g - 1))) / M;
+const pRatio = (M, g) => Math.pow(1 + 0.5 * (g - 1) * M * M, -g / (g - 1));
+const tRatio = (M, g) => 1 / (1 + 0.5 * (g - 1) * M * M);
+const shockP = (M1, g) => 1 + 2 * g / (g + 1) * (M1 * M1 - 1);
+const shockM2 = (M1, g) => Math.sqrt((1 + 0.5 * (g - 1) * M1 * M1) / (g * M1 * M1 - 0.5 * (g - 1)));
+const shockP0 = (M1, g) => Math.pow(((g + 1) * M1 * M1) / ((g - 1) * M1 * M1 + 2), g / (g - 1)) * Math.pow((g + 1) / (2 * g * M1 * M1 - (g - 1)), 1 / (g - 1));
+function machFromArea(r, g, sup) {
+  if (!(r > 1.0000001)) return 1;
+  let lo = sup ? 1 : 1e-6, hi = sup ? 60 : 1;
+  for (let it = 0; it < 80; it++) { const m = 0.5 * (lo + hi), f = AoverAstar(m, g); if (sup) { if (f < r) lo = m; else hi = m; } else { if (f > r) lo = m; else hi = m; } }
+  return 0.5 * (lo + hi);
+}
+
+const TIERS = [
+  { dx: 0.34, mIn: 7, mOut: 5 }, { dx: 0.26, mIn: 9, mOut: 6 }, { dx: 0.19, mIn: 12, mOut: 8 }, { dx: 0.14, mIn: 16, mOut: 10 }
+];
+const HH = 7, HT = 1, HIN = 3.4;
+
+function buildGeom(aspect, tier, type, arReq) {
+  const T = TIERS[tier], cy = HH, Wd = 2 * HH * aspect;
+  const nx = Math.round(Wd / T.dx), dx = Wd / nx, mIn = T.mIn, mOut = T.mOut, nyT = 2 * (mIn + mOut);
+  const ixT = Math.round(0.22 * nx), IE = Math.round(0.62 * nx), xt = ixT * dx, xe = IE * dx, Ld = xe - xt;
+  const ht = HT, hin = HIN, he = type === 'conv' ? ht : clamp(arReq, 1, 5) * ht, dh = he - ht;
+  const h = x => {
+    if (x < xt) return ht + (hin - ht) * 0.5 * (1 + Math.cos(PI * x / xt));
+    if (type === 'conv') return ht;
+    const s = Math.min(1, (x - xt) / Ld);
+    switch (type) {
+      case 'conical': return ht + dh * s;
+      case 'bell': return ht + dh * (1 - (1 - s) * (1 - s));
+      case 'scurve': return ht + dh * 0.5 * (1 - Math.cos(PI * s));
+      case 'dual': { const s1 = 0.45, d1 = 0.45 * dh; if (s < s1) return ht + d1 * (1 - (1 - s / s1) * (1 - s / s1)); const u = (s - s1) / (1 - s1); return ht + d1 + (dh - d1) * (1 - (1 - u) * (1 - u)); }
+    }
+    return ht;
+  };
+  const N = nx * nyT, nv = nx + 1;
+  const Hv = new Float64Array(nv); for (let i = 0; i <= nx; i++) Hv[i] = i < IE ? h(i * dx) : he;
+  const yv = new Float64Array(nv * (nyT + 1));
+  for (let i = 0; i <= nx; i++) {
+    const H = Hv[i];
+    for (let jv = 0; jv <= nyT; jv++) {
+      let y;
+      if (jv <= mOut) y = (cy - H) * (jv / mOut);
+      else if (jv <= mOut + 2 * mIn) y = cy + H * ((jv - mOut) / mIn - 1);
+      else y = cy + H + (2 * HH - (cy + H)) * ((jv - mOut - 2 * mIn) / mOut);
+      yv[jv * nv + i] = y;
+    }
+  }
+  const act = new Uint8Array(N), xc = new Float64Array(N), yc = new Float64Array(N), V = new Float64Array(N);
+  const Ly = new Float64Array(N), Lj = new Float64Array(N), njx = new Float64Array(N), njy = new Float64Array(N);
+  for (let j = 0; j < nyT; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i, y00 = yv[j * nv + i], y10 = yv[j * nv + i + 1], y01 = yv[(j + 1) * nv + i], y11 = yv[(j + 1) * nv + i + 1];
+    act[k] = ((j < mOut || j >= mOut + 2 * mIn) && i < IE) ? 0 : 1;
+    xc[k] = (i + 0.5) * dx; yc[k] = 0.25 * (y00 + y10 + y01 + y11);
+    Ly[k] = y01 - y00; V[k] = dx * 0.5 * ((y01 - y00) + (y11 - y10));
+    const dyy = y10 - y00, len = Math.sqrt(dx * dx + dyy * dyy); Lj[k] = len; njx[k] = -dyy / len; njy[k] = dx / len;
+  }
+  return { type, nx, nyT, mIn, mOut, dx, Wd, Hh: HH, cy, ht, he, hin, xt, xe, Ld, ixT, IE, h, Hv, yv, act, xc, yc, V, Ly, Lj, njx, njy,
+           At: 2 * ht, Ae: 2 * he, N, nv, ivT: type === 'conv' ? IE : ixT };
+}
+
+function computeTheory(g, geom, npr) {
+  const At = geom.At, Ae = geom.Ae, AR = Ae / At, T = { g, npr, AR };
+  T.MeSub = machFromArea(AR, g, false); T.MeSup = machFromArea(AR, g, true);
+  T.npr1 = 1 / pRatio(T.MeSub, g); T.nprD = 1 / pRatio(T.MeSup, g); T.npr2 = 1 / (pRatio(T.MeSup, g) * shockP(T.MeSup, g));
+  const tol = 0.015; let reg;
+  if (npr < T.npr1) reg = 'sub'; else if (npr < T.npr2 * (1 - tol)) reg = 'shock'; else if (npr < T.nprD * (1 - tol)) reg = 'over'; else if (npr <= T.nprD * (1 + tol)) reg = 'design'; else reg = 'under';
+  T.reg = reg; T.iShock = -1;
+  const psi = Math.pow(2 / (g + 1), (g + 1) / (2 * (g - 1))), pbN = 1 / (g * npr), veOf = M => M * Math.sqrt(tRatio(M, g));
+  if (reg === 'sub') {
+    const Me = Math.sqrt(2 / (g - 1) * (Math.pow(npr, (g - 1) / g) - 1)); T.Me = Me; T.Ve = veOf(Me);
+    T.mdot = pRatio(Me, g) / tRatio(Me, g) * T.Ve * Ae; T.F = T.mdot * T.Ve; T.AstarSub = Ae / AoverAstar(Me, g); T.Mt = machFromArea(At / T.AstarSub, g, false);
+  } else {
+    T.mdot = psi * At; T.Mt = 1;
+    if (reg === 'shock') {
+      const peOf = M1 => { const M2 = shockM2(M1, g), r1 = AoverAstar(M1, g), Re = AR * AoverAstar(M2, g) / r1; return shockP0(M1, g) * pRatio(machFromArea(Re, g, false), g); };
+      let lo = 1, hi = T.MeSup; for (let it = 0; it < 60; it++) { const m = 0.5 * (lo + hi); if (peOf(m) > 1 / npr) lo = m; else hi = m; }
+      const M1 = 0.5 * (lo + hi), M2 = shockM2(M1, g), r1 = AoverAstar(M1, g), p02 = shockP0(M1, g);
+      T.M1 = M1; T.r1 = r1; T.A2star = r1 * At / AoverAstar(M2, g); T.p02 = p02;
+      T.Me = Math.sqrt(2 / (g - 1) * (Math.pow(p02 * npr, (g - 1) / g) - 1)); T.Ve = veOf(T.Me); T.F = T.mdot * T.Ve;
+      // shock x-position: area ratio r1 in the diverging section
+      let a = geom.xt, b = geom.xe; for (let it = 0; it < 50; it++) { const m = 0.5 * (a + b); if (geom.h(m) / geom.ht < r1) a = m; else b = m; } T.xShock = 0.5 * (a + b); T.iShock = Math.ceil(T.xShock / geom.dx - 0.5);
+    } else {
+      T.Me = T.MeSup; T.Ve = veOf(T.Me); T.F = T.mdot * T.Ve + (pRatio(T.Me, g) / g - pbN) * Ae;
+    }
+  }
+  T.CF = T.F * g / At;
+  const n = geom.IE; T.curveM = new Float32Array(n); T.curveP = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const xm = (i + 0.5) * geom.dx, a = 2 * geom.h(xm); let m, p;
+    if (reg === 'sub') { m = machFromArea(a / T.AstarSub, g, false); p = pRatio(m, g); }
+    else if (xm < geom.xt || (geom.type === 'conv')) { m = machFromArea(a / At, g, false); p = pRatio(m, g); }
+    else if (reg === 'shock' && xm >= T.xShock) { m = machFromArea(a / T.A2star, g, false); p = T.p02 * pRatio(m, g); }
+    else { m = machFromArea(a / At, g, true); p = pRatio(m, g); }
+    T.curveM[i] = m; T.curveP[i] = p;
+  }
+  return T;
+}
+
+class NozzleSolver {
+  constructor(geom, gam) {
+    const N = geom.N; this.N = N; this.nx = geom.nx; this.ny = geom.nyT;
+    const mk = () => [new Float64Array(N), new Float64Array(N), new Float64Array(N), new Float64Array(N)];
+    this.Q = mk(); this.Q1 = mk(); this.L = mk();
+    this.rho = new Float64Array(N); this.pu = new Float64Array(N); this.pv = new Float64Array(N); this.pp = new Float64Array(N);
+    this.fluid = new Uint8Array(N); this.dtc = new Float64Array(N); this.lts = 8; this.order = 2; this.lowM = true; this.f4 = new Float64Array(4); this.t = 0;
+    this.setGas(gam); this.setNPR(10); this.setGeometry(geom, true);
+  }
+  setGas(g) { this.g = g; this.g1 = g - 1; this.p0 = 1 / g; }
+  setNPR(npr) { this.npr = npr; this.pb = this.p0 / npr; this.rb = this.g * this.pb; }
+  _setState(k, r, u, v, p) { const Q = this.Q; Q[0][k] = r; Q[1][k] = r * u; Q[2][k] = r * v; Q[3][k] = p / this.g1 + 0.5 * r * (u * u + v * v); }
+  setGeometry(geom, init) {
+    this.geom = geom; const { nx, nyT } = geom, K = [], I = [], TY = [], NXs = [], NYs = [];
+    for (let k = 0; k < this.N; k++) { if (geom.act[k] && !this.fluid[k]) this._setState(k, this.rb, 0, 0, this.pb); this.fluid[k] = geom.act[k]; }
+    for (let j = 0; j < nyT; j++) for (let i = 0; i < nx; i++) {
+      if (i > 0 && i < nx - 1 && j > 0 && j < nyT - 1) continue;
+      const k = j * nx + i; if (!geom.act[k]) continue;
+      K.push(k); I.push(k + (i === 0 ? 1 : 0) - (i === nx - 1 ? 1 : 0) + (j === 0 ? nx : 0) - (j === nyT - 1 ? nx : 0));
+      TY.push(i === 0 ? 0 : 1); NXs.push(i === nx - 1 ? 1 : 0); NYs.push(j === nyT - 1 ? 1 : (j === 0 ? -1 : 0));
+    }
+    this.bcK = Int32Array.from(K); this.bcI = Int32Array.from(I); this.bcT = Uint8Array.from(TY); this.bcNX = Int8Array.from(NXs); this.bcNY = Int8Array.from(NYs);
+  }
+  reset(T) {
+    const geom = this.geom, g = this.g, nx = this.nx;
+    for (let k = 0; k < this.N; k++) {
+      if (!this.fluid[k]) continue;
+      if (T && T.reg === 'sub' && geom.xc[k] < geom.xe) {
+        const i = Math.min(k % nx, T.curveM.length - 1), m = T.curveM[i], pr = T.curveP[i], Ts = tRatio(m, g);
+        this._setState(k, pr / Ts, m * Math.sqrt(Ts), 0, pr / g);
+      } else if (geom.xc[k] < geom.xt) this._setState(k, 1, 0, 0, this.p0); else this._setState(k, this.rb, 0, 0, this.pb);
+    }
+    this.t = 0;
+  }
+  _prims(Q) {
+    const R = Q[0], MX = Q[1], MY = Q[2], E = Q[3], { rho, pu, pv, pp, fluid, g, g1 } = this, G = this.geom; let dtmin = 1e9;
+    for (let k = 0; k < this.N; k++) {
+      if (!fluid[k]) { rho[k] = 1; pu[k] = 0; pv[k] = 0; pp[k] = this.p0; continue; }
+      let r = R[k]; if (r < 1e-4) r = 1e-4;
+      const u = MX[k] / r, v = MY[k] / r; let p = g1 * (E[k] - 0.5 * r * (u * u + v * v)); if (p < 1e-4) p = 1e-4;
+      rho[k] = r; pu[k] = u; pv[k] = v; pp[k] = p;
+      const c = Math.sqrt(g * p / r), hc = G.V[k] / G.dx, unj = u * G.njx[k] + v * G.njy[k];
+      const dtc = G.V[k] / ((Math.abs(u) + c) * hc + (Math.abs(unj) + c) * G.Lj[k]);
+      this.dtc[k] = dtc; if (dtc < dtmin) dtmin = dtc;
+    }
+    return dtmin;
+  }
+  _flux(rl, ul, vl, pl, rr, ur, vr, pr, nx, ny) {
+    const g = this.g, g1 = this.g1, unl = ul * nx + vl * ny, unr = ur * nx + vr * ny;
+    const El = pl / g1 + 0.5 * rl * (ul * ul + vl * vl), Er = pr / g1 + 0.5 * rr * (ur * ur + vr * vr);
+    const cl = Math.sqrt(g * pl / rl), cr = Math.sqrt(g * pr / rr), sl = Math.abs(unl) + cl, sr = Math.abs(unr) + cr, s = sl > sr ? sl : sr;
+    const ml = rl * unl, mr = rr * unr, f = this.f4;
+    f[0] = 0.5 * (ml + mr) - 0.5 * s * (rr - rl);
+    f[1] = 0.5 * (ml * ul + pl * nx + mr * ur + pr * nx) - 0.5 * s * (rr * ur - rl * ul);
+    f[2] = 0.5 * (ml * vl + pl * ny + mr * vr + pr * ny) - 0.5 * s * (rr * vr - rl * vl);
+    f[3] = 0.5 * ((El + pl) * unl + (Er + pr) * unr) - 0.5 * s * (Er - El);
+  }
+  _rhs(L) {
+    const { nx, ny, fluid, rho, pu, pv, pp, f4 } = this, G = this.geom, ord2 = this.order === 2;
+    for (let c = 0; c < 4; c++) L[c].fill(0);
+    const mm = (a, b) => (a * b <= 0) ? 0 : (Math.abs(a) < Math.abs(b) ? a : b);
+    for (let dir = 0; dir < 2; dir++) {
+      const st = dir === 0 ? 1 : nx, jB = dir === 0 ? ny - 1 : ny, iB = dir === 0 ? nx : nx - 1;
+      for (let j = 1; j < jB; j++) for (let i = 1; i < iB; i++) {
+        const kR = j * nx + i, kL = kR - st, fl = fluid[kL], fr = fluid[kR];
+        if (!fl && !fr) continue;
+        const nxn = dir === 0 ? 1 : G.njx[kR], nyn = dir === 0 ? 0 : G.njy[kR], len = dir === 0 ? G.Ly[kR] : G.Lj[kR];
+        let rl, ul, vl, pl, rr, ur, vr, pr;
+        if (fl && fr) {
+          rl = rho[kL]; ul = pu[kL]; vl = pv[kL]; pl = pp[kL]; rr = rho[kR]; ur = pu[kR]; vr = pv[kR]; pr = pp[kR];
+          const idx = dir === 0 ? i : j, lim = dir === 0 ? nx : ny;
+          if (ord2 && idx >= 2 && idx <= lim - 2 && fluid[kL - st] && fluid[kR + st]) {
+            const a = kL - st, b = kR + st;
+            const rl2 = rl + 0.5 * mm(rl - rho[a], rr - rl), rr2 = rr - 0.5 * mm(rr - rl, rho[b] - rr);
+            const pl2 = pl + 0.5 * mm(pl - pp[a], pr - pl), pr2 = pr - 0.5 * mm(pr - pl, pp[b] - pr);
+            if (rl2 > 1e-4 && rr2 > 1e-4 && pl2 > 1e-4 && pr2 > 1e-4) {
+              ul += 0.5 * mm(ul - pu[a], ur - ul); ur -= 0.5 * mm(ur - ul, pu[b] - ur);
+              vl += 0.5 * mm(vl - pv[a], vr - vl); vr -= 0.5 * mm(vr - vl, pv[b] - vr);
+              rl = rl2; rr = rr2; pl = pl2; pr = pr2;
+            }
+          }
+        } else if (fl) {          // wall on the R side: mirror L about the face normal
+          rr = rl = rho[kL]; pr = pl = pp[kL]; ul = pu[kL]; vl = pv[kL]; const un = ul * nxn + vl * nyn; ur = ul - 2 * un * nxn; vr = vl - 2 * un * nyn;
+        } else {                  // wall on the L side
+          rr = rl = rho[kR]; pr = pl = pp[kR]; ur = pu[kR]; vr = pv[kR]; const un = ur * nxn + vr * nyn; ul = ur - 2 * un * nxn; vl = vr - 2 * un * nyn;
+        }
+        if (fl && fr && this.lowM) {   // Thornber low-Mach correction of the reconstructed velocity jump
+          const Ml = Math.sqrt((ul * ul + vl * vl) * rl / (this.g * pl)), Mr = Math.sqrt((ur * ur + vr * vr) * rr / (this.g * pr));
+          let z = Ml > Mr ? Ml : Mr; if (z > 1) z = 1; if (z < 0.02) z = 0.02;
+          const ma = 0.5 * (ul + ur), mb = 0.5 * (vl + vr), da = 0.5 * (ul - ur) * z, db = 0.5 * (vl - vr) * z;
+          ul = ma + da; ur = ma - da; vl = mb + db; vr = mb - db;
+        }
+        this._flux(rl, ul, vl, pl, rr, ur, vr, pr, nxn, nyn);
+        const insideL = fl && (dir === 0 ? i - 1 >= 1 : j - 1 >= 1), insideR = fr && (dir === 0 ? i <= nx - 2 : j <= ny - 2);
+        if (insideL) { const s = len / G.V[kL]; for (let c = 0; c < 4; c++) L[c][kL] -= f4[c] * s; }
+        if (insideR) { const s = len / G.V[kR]; for (let c = 0; c < 4; c++) L[c][kR] += f4[c] * s; }
+      }
+    }
+  }
+  _bc(Q) {
+    const { g, g1, p0, pb, rb, bcK, bcI, bcT, bcNX, bcNY } = this, R = Q[0], MX = Q[1], MY = Q[2], E = Q[3];
+    for (let q = 0; q < bcK.length; q++) {
+      const k = bcK[q], kin = bcI[q]; let r = R[kin]; if (r < 1e-4) r = 1e-4;
+      let u = MX[kin] / r, v = MY[kin] / r, p = g1 * (E[kin] - 0.5 * r * (u * u + v * v));
+      if (bcT[q] === 0) {
+        if (p > p0) p = p0; if (p < 1e-4) p = 1e-4;
+        const M2 = 2 / g1 * (Math.pow(p0 / p, g1 / g) - 1); let M = Math.sqrt(M2 > 0 ? M2 : 0); if (M > 0.85) M = 0.85;
+        const Ts = 1 / (1 + 0.5 * g1 * M * M), rho = g * p / Ts, uu = M * Math.sqrt(Ts);
+        R[k] = rho; MX[k] = rho * uu; MY[k] = 0; E[k] = p / g1 + 0.5 * rho * uu * uu;
+      } else {
+        if (p < 1e-4) p = 1e-4;
+        const c = Math.sqrt(g * p / r), un = u * bcNX[q] + v * bcNY[q];
+        if (un < -1e-6) { r = rb; u = 0; v = 0; p = pb; } else if (un < c) p = pb;
+        R[k] = r; MX[k] = r * u; MY[k] = r * v; E[k] = p / g1 + 0.5 * r * (u * u + v * v);
+      }
+    }
+  }
+  _fix(Q) {
+    const { nx, ny, fluid, g1 } = this;
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i; if (!fluid[k]) continue;
+      if (!(Q[0][k] > 1e-4)) { Q[0][k] = 1e-4; Q[1][k] = Q[2][k] = 0; }
+      const ke = 0.5 * (Q[1][k] * Q[1][k] + Q[2][k] * Q[2][k]) / Q[0][k];
+      if (!(Q[3][k] - ke > 1e-4 / g1)) Q[3][k] = ke + 1e-4 / g1;
+    }
+  }
+  step() {
+    const { nx, ny, fluid, Q, Q1, L, dtc } = this, dtmin = this._prims(Q), cfl = this.order === 2 ? 0.5 : 0.7, cap = this.lts > 1 ? this.lts * dtmin : dtmin;
+    const dtk = this.dtk || (this.dtk = new Float64Array(this.N));
+    for (let k = 0; k < this.N; k++) { const d = dtc[k]; dtk[k] = cfl * (d < cap ? d : cap); }
+    this._rhs(L);
+    if (this.order === 1) {
+      for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const k = j * nx + i; if (!fluid[k]) continue; for (let c = 0; c < 4; c++) Q[c][k] += dtk[k] * L[c][k]; }
+      this._fix(Q); this._bc(Q);
+    } else {
+      for (let c = 0; c < 4; c++) Q1[c].set(Q[c]);
+      for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const k = j * nx + i; if (!fluid[k]) continue; for (let c = 0; c < 4; c++) Q1[c][k] = Q[c][k] + dtk[k] * L[c][k]; }
+      this._fix(Q1); this._bc(Q1); this._prims(Q1); this._rhs(L);
+      for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const k = j * nx + i; if (!fluid[k]) continue; for (let c = 0; c < 4; c++) Q[c][k] = 0.5 * Q[c][k] + 0.5 * (Q1[c][k] + dtk[k] * L[c][k]); }
+      this._fix(Q); this._bc(Q);
+    }
+    this.t += cfl * dtmin;
+  }
+  /* integrals over a vertical face at vertex column iv (inner rows only) */
+  faceStats(iv) {
+    const G = this.geom, { nx, rho, pu, pv, pp, g, pb } = this; let md = 0, mom = 0, rhou2 = 0, mach = 0, len = 0;
+    for (let j = G.mOut; j < G.mOut + 2 * G.mIn; j++) {
+      const kR = j * nx + iv, kL = kR - 1, dy = G.Ly[kR];
+      const r = 0.5 * (rho[kL] + rho[kR]), u = 0.5 * (pu[kL] + pu[kR]), v = 0.5 * (pv[kL] + pv[kR]), p = 0.5 * (pp[kL] + pp[kR]);
+      md += r * u * dy; rhou2 += r * u * u * dy; mom += (r * u * u + p - pb) * dy; mach += Math.sqrt((u * u + v * v) * r / (g * p)) * dy; len += dy;
+    }
+    return { md, mom, rhou2, mach: mach / len };
+  }
+}
+
+/* ------------------------------ colour maps ----------------------------- */
+function makeLUT(stops) {
+  const lut = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255; let k = 0;
+    while (k < stops.length - 2 && t > stops[k + 1][0]) k++;
+    const a = stops[k], b = stops[k + 1], f = clamp((t - a[0]) / (b[0] - a[0]), 0, 1);
+    const R = a[1] + (b[1] - a[1]) * f, G = a[2] + (b[2] - a[2]) * f, B = a[3] + (b[3] - a[3]) * f;
+    lut[i] = (255 << 24) | ((B | 0) << 16) | ((G | 0) << 8) | (R | 0);
+  }
+  return lut;
+}
+function makeMachLUT(Mmax) {
+  const base = [[0, 10, 14, 40], [0.5, 30, 80, 210], [0.9, 50, 190, 235], [1.0, 110, 235, 150], [1.5, 240, 230, 70], [2.2, 250, 140, 40], [3.0, 240, 60, 50], [4.5, 140, 20, 90], [8, 90, 10, 80]];
+  const st = []; for (const b of base) if (b[0] / Mmax < 1) st.push([b[0] / Mmax, b[1], b[2], b[3]]);
+  const last = base.find(b => b[0] / Mmax >= 1) || base[base.length - 1]; st.push([1, last[1], last[2], last[3]]);
+  return makeLUT(st);
+}
+const LUT_SPD = makeLUT([[0, 12, 16, 46], [0.2, 32, 44, 160], [0.4, 22, 150, 205], [0.55, 40, 205, 125], [0.7, 225, 225, 55], [0.85, 252, 135, 30], [1, 255, 50, 50]]);
+const LUT_SCH = makeLUT([[0, 8, 11, 18], [0.5, 90, 120, 160], [1, 238, 247, 255]]);
+const LUT_PRES = makeLUT([[0, 10, 8, 30], [0.25, 70, 15, 110], [0.5, 175, 40, 95], [0.75, 245, 120, 40], [1, 255, 240, 160]]);
+const LUT_TMP = makeLUT([[0, 12, 12, 50], [0.3, 60, 30, 150], [0.55, 200, 40, 90], [0.8, 250, 140, 40], [1, 255, 245, 170]]);
+const LUT_RHO = makeLUT([[0, 68, 1, 84], [0.25, 59, 82, 139], [0.5, 33, 145, 140], [0.75, 94, 201, 98], [1, 253, 231, 37]]);
+
+const REGIMES = {
+  sub:    'Subsonic · unchoked (M_throat < 1)',
+  shock:  'Choked · normal shock in diverging section',
+  over:   'Over-expanded · oblique shocks in the jet',
+  design: 'Perfectly expanded (design point)',
+  under:  'Under-expanded · expansion fans, Mach diamonds'
+};
+
+/* =============================================================================
+   APPLICATION  (DOM, rendering, particles, interaction, PWA)
+   ============================================================================= */
+function main() {
+  const $ = id => document.getElementById(id);
+  const stage = $('stage'), base = $('base'), trail = $('trail'), plot = $('plot');
+  const bctx = base.getContext('2d'), tctx = trail.getContext('2d'), pctx = plot.getContext('2d');
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.hardwareConcurrency || 8) <= 4;
+  const smallScreen = Math.min(window.innerWidth, window.innerHeight) < 500;
+  const H2 = 2 * HH;                                                   // domain height in length units
+
+  const S = {
+    type: 'bell', ar: 3, gas: 'air', p0: 500, T0: 600, wt: 50, npr: 20,
+    field: 'mach', tracer: 'smoke', sonic: true, theory: true, streams: false, vectors: false,
+    plotOn: !smallScreen, plotMode: 'mach', hudOn: true, auto: true, tier: isMobile ? 1 : 2,
+    order2: !isMobile, paused: false
+  };
+  $('order2').checked = S.order2;
+  if (smallScreen) $('panel').classList.add('hidden');
+
+  let solver = null, geom = null, TH = null, aspect = 16 / 9, N = 0;
+  let cM, cP, cT, cR, cu, cv, tt;
+  let cssW = 1, cssH = 1, dpr = 1, tdpr = 1, pdpr = 1;
+  let geomDirty = true, thDirty = true, firstBuild = true;
+  let LUT_MACH = makeMachLUT(3), Mmax = 3, lminP = -1.3, lminR = -1.2, Vscale = 2;
+  const diag = { Mt: 0, Me: 0, Ve: 0, md: 0, F: 0 };
+  let streamPath = null, streamAge = 99;
+  let RW = 2, RH = 2, fieldCanvas, fctx, fimg, f32, LK = null;          // raster for the field
+  let kx = 1, ky = 1;                                                   // screen px per length unit
+
+  const gasOf = () => GASES[S.gas];
+  function resizeCanvases() {
+    cssW = Math.max(100, stage.clientWidth); cssH = Math.max(100, stage.clientHeight);
+    dpr = Math.min(window.devicePixelRatio || 1, S.tier <= 0 ? 1 : 2); tdpr = Math.min(dpr, 1.5);
+    base.width = Math.round(cssW * dpr); base.height = Math.round(cssH * dpr);
+    trail.width = Math.round(cssW * tdpr); trail.height = Math.round(cssH * tdpr);
+    pdpr = Math.min(window.devicePixelRatio || 1, 2);
+    plot.width = Math.round(plot.clientWidth * pdpr) || 260; plot.height = Math.round(plot.clientHeight * pdpr) || 112;
+    streamPath = null;
+  }
+  function updateScale() { kx = cssW / geom.Wd; ky = cssH / H2; }
+  const sx = x => x * kx, sy = y => cssH - y * ky;
+
+  /* geometry (re)build: cheap, so it can run every frame while dragging the lip */
+  function makeGeom() { geom = buildGeom(aspect, S.tier, S.type, S.ar); }
+  function rebuild() {
+    resizeCanvases();
+    aspect = clamp(cssW / cssH, 1.3, 3.2);
+    makeGeom(); N = geom.N;
+    cM = new Float32Array(N); cP = new Float32Array(N); cT = new Float32Array(N); cR = new Float32Array(N);
+    cu = new Float32Array(N); cv = new Float32Array(N); tt = new Float32Array(N);
+    solver = new NozzleSolver(geom, gasOf().g); solver.order = S.order2 ? 2 : 1;
+    updateScale();
+    TH = computeTheory(gasOf().g, geom, S.npr);
+    if (firstBuild) { S.npr = TH.nprD; firstBuild = false; }
+    solver.setNPR(S.npr); TH = computeTheory(gasOf().g, geom, S.npr); solver.reset(TH);
+    geomDirty = false; thDirty = true; applyTheory(); buildLookup();
+    initParticles(); updateLegend(); syncUi();
+  }
+  function applyGeom() {
+    geomDirty = false; makeGeom(); solver.setGeometry(geom); updateScale(); buildLookup();
+    thDirty = true; streamAge = 99; syncUi();
+  }
+  function applyTheory() {
+    thDirty = false; TH = computeTheory(gasOf().g, geom, S.npr);
+    Mmax = clamp(Math.ceil(2 * TH.MeSup * 1.15) / 2, 2.5, 7); LUT_MACH = makeMachLUT(Mmax);
+    const g = gasOf().g; Vscale = Math.sqrt(2 / (g - 1)) * 0.85;
+    lminP = Math.min(-0.7, Math.log10(0.5 / S.npr)); lminR = lminP / (g > 1.3 ? 1.3 : 1.15);
+    updateLegend();
+  }
+  function restart() { solver.setNPR(S.npr); TH = computeTheory(gasOf().g, geom, S.npr); solver.reset(TH); initParticles(); }
+
+  function units() {
+    const g = gasOf(), p0 = S.p0 * 1000, T0 = S.T0, rho0 = p0 / (g.R * T0), a0 = Math.sqrt(g.g * g.R * T0);
+    const delta = S.wt / 1000 / 2;                                      // metres per length unit (throat half-height = 1 unit)
+    return { g: g.g, R: g.R, p0, T0, rho0, a0, delta, pb: p0 / S.npr, pref: g.g * p0 };
+  }
+
+  /* ----------------- field raster: pixel -> 4 cells + bilinear weights ------------- */
+  const isFluid = (x, y) => x > 0 && x < geom.Wd && y > 0.03 && y < H2 - 0.03 && (x >= geom.xe || Math.abs(y - geom.cy) < geom.h(x));
+  /* locate (x,y): fills loc.{a,b,c,d,wx,wy}; returns false if outside the fluid. Bilinear in (i,j) index space between cell centres. */
+  const loc = { a: 0, b: 0, c: 0, d: 0, wx: 0, wy: 0 };
+  function locate(x, y) {
+    const G = geom, nx = G.nx;
+    let i = Math.floor(x / G.dx); if (i < 0) i = 0; if (i > nx - 1) i = nx - 1;
+    const jmin = i < G.IE ? G.mOut : 0, jmax = i < G.IE ? G.mOut + 2 * G.mIn - 1 : G.nyT - 1, yc = G.yc;
+    let lo = jmin, hi = jmax;
+    if (y <= yc[jmin * nx + i]) { lo = jmin; hi = jmin + 1; }
+    else if (y >= yc[jmax * nx + i]) { lo = jmax - 1; hi = jmax; }
+    else { while (hi - lo > 1) { const m = (lo + hi) >> 1; if (yc[m * nx + i] <= y) lo = m; else hi = m; } }
+    let wy = (y - yc[lo * nx + i]) / (yc[hi * nx + i] - yc[lo * nx + i]); wy = wy < 0 ? 0 : (wy > 1 ? 1 : wy);
+    const fx = x / G.dx - i - 0.5; let iN = fx > 0 ? i + 1 : i - 1, wx = Math.abs(fx); if (wx > 1) wx = 1;
+    if (iN < 0 || iN > nx - 1 || !G.act[lo * nx + iN] || !G.act[hi * nx + iN]) { iN = i; wx = 0; }
+    loc.a = lo * nx + i; loc.b = lo * nx + iN; loc.c = hi * nx + i; loc.d = hi * nx + iN; loc.wx = wx; loc.wy = wy;
+  }
+  const sv = [0, 0];
+  function velAt(x, y) {
+    locate(x, y); const { a, b, c, d, wx, wy } = loc;
+    sv[0] = (cu[a] * (1 - wx) + cu[b] * wx) * (1 - wy) + (cu[c] * (1 - wx) + cu[d] * wx) * wy;
+    sv[1] = (cv[a] * (1 - wx) + cv[b] * wx) * (1 - wy) + (cv[c] * (1 - wx) + cv[d] * wx) * wy;
+  }
+  function buildLookup() {
+    RW = clamp(Math.round(cssW / 2.2), 200, 480); RH = Math.max(60, Math.round(RW * cssH / cssW));
+    fieldCanvas = document.createElement('canvas'); fieldCanvas.width = RW; fieldCanvas.height = RH;
+    fctx = fieldCanvas.getContext('2d'); fimg = fctx.createImageData(RW, RH); f32 = new Uint32Array(fimg.data.buffer);
+    const n = RW * RH;
+    LK = { a: new Int32Array(n), b: new Int32Array(n), c: new Int32Array(n), d: new Int32Array(n), wx: new Float32Array(n), wy: new Float32Array(n) };
+    for (let py = 0; py < RH; py++) for (let px = 0; px < RW; px++) {
+      const q = py * RW + px, x = (px + 0.5) / RW * geom.Wd, y = (1 - (py + 0.5) / RH) * H2;
+      if (!isFluid(x, y)) { LK.a[q] = -1; continue; }
+      locate(x, y); LK.a[q] = loc.a; LK.b[q] = loc.b; LK.c[q] = loc.c; LK.d[q] = loc.d; LK.wx[q] = loc.wx; LK.wy[q] = loc.wy;
+    }
+  }
+
+  /* ------------------------------ simulation step --------------------------- */
+  let simMs = 0;
+  function exportFields() {
+    solver._prims(solver.Q);
+    const { fluid, rho, pu, pv, pp, g } = solver;
+    for (let k = 0; k < N; k++) {
+      if (!fluid[k]) { cM[k] = 0; cP[k] = 1; cT[k] = 1; cR[k] = 1; cu[k] = 0; cv[k] = 0; continue; }
+      const r = rho[k], u = pu[k], v = pv[k], p = pp[k];
+      cM[k] = Math.sqrt((u * u + v * v) * r / (g * p)); cP[k] = p * g; cT[k] = g * p / r; cR[k] = r; cu[k] = u; cv[k] = v;
+    }
+  }
+  function stepSim() {
+    const t0 = performance.now(); let n = 0; const budget = 9;
+    do { solver.step(); n++; } while (n < 40 && performance.now() - t0 < budget);
+    exportFields(); computeDiag();
+    simMs += (performance.now() - t0 - simMs) * 0.1;
+  }
+  function computeDiag() {
+    const a = 0.12, t = solver.faceStats(geom.ivT), e = solver.faceStats(geom.IE);
+    const ve = e.md > 1e-6 ? e.rhou2 / e.md : 0;
+    diag.Mt += a * (t.mach - diag.Mt); diag.Me += a * (e.mach - diag.Me); diag.Ve += a * (ve - diag.Ve);
+    diag.md += a * (e.md - diag.md); diag.F += a * (e.mom - diag.F);
+  }
+
+  /* ------------------------------ particles --------------------------------- */
+  const P = { cap: 0, x: null, y: null, px: null, py: null, age: null, alive: null, head: 0 };
+  const NB = 6, BCOL = ['#4a8dff', '#38c4ff', '#6ff0cf', '#e6f47c', '#ffb347', '#ff6b6b'];
+  let segs = [], segN = [];
+  function initParticles() {
+    P.cap = S.tracer === 'smoke' ? 6000 : (S.tracer === 'path' ? 700 + 500 * S.tier : 0);
+    P.x = new Float32Array(P.cap); P.y = new Float32Array(P.cap); P.px = new Float32Array(P.cap); P.py = new Float32Array(P.cap);
+    P.age = new Uint16Array(P.cap); P.alive = new Uint8Array(P.cap); P.head = 0;
+    segs = []; segN = new Int32Array(NB); for (let b = 0; b < NB; b++) segs.push(new Float32Array(P.cap * 4 + 4));
+    if (S.tracer === 'path' && geom) for (let k = 0; k < P.cap; k++) spawnRandom(k, true);
+    tctx.clearRect(0, 0, trail.width, trail.height);
+  }
+  function spawnRandom(k, anywhere) {
+    for (let tries = 0; tries < 10; tries++) {
+      const x = anywhere ? Math.random() * geom.Wd * 0.98 : 0.15 + Math.random() * 0.5;
+      const y = anywhere ? 0.1 + Math.random() * (H2 - 0.2) : geom.cy + (Math.random() * 2 - 1) * (geom.hin - 0.4);
+      if (isFluid(x, y)) { P.x[k] = x; P.y[k] = y; break; }
+      P.x[k] = 0.2; P.y[k] = geom.cy;
+    }
+    P.px[k] = P.x[k]; P.py[k] = P.y[k]; P.age[k] = 0; P.alive[k] = 1;
+  }
+  const tracerSpeed = () => 0.012 * geom.Wd;                           // length units per frame per unit (non-dim) velocity
+  function vRef() { return Math.max(1.2, TH.Ve > 0 ? Math.max(TH.Ve, 1) * 1.05 : 1.2, 0.9 * Vscale * 0.6); }
+  function updateParticles() {
+    if (!P.cap) return;
+    const K = tracerSpeed(), sub = 2, h = K / sub;
+    if (S.tracer === 'smoke') {
+      const lines = 12;
+      for (let l = 0; l < lines; l++) {
+        const k = P.head; P.head = (P.head + 1) % P.cap;
+        if (P.alive[k]) continue;
+        P.x[k] = 0.2; P.y[k] = geom.cy - geom.hin + 0.3 + (l + 0.5) * (2 * geom.hin - 0.6) / lines;
+        P.px[k] = P.x[k]; P.py[k] = P.y[k]; P.age[k] = 0; P.alive[k] = 1;
+      }
+    }
+    segN.fill(0); const vr = vRef();
+    for (let k = 0; k < P.cap; k++) {
+      if (!P.alive[k]) continue;
+      let x = P.x[k], y = P.y[k]; P.px[k] = x; P.py[k] = y;
+      for (let s = 0; s < sub; s++) {
+        velAt(x, y); const xm = x + 0.5 * h * sv[0], ym = y + 0.5 * h * sv[1];
+        velAt(xm, ym); x += h * sv[0]; y += h * sv[1];
+      }
+      P.age[k]++;
+      if (x >= geom.Wd - 0.3 || !isFluid(x, y) || P.age[k] > 1500) {
+        if (S.tracer === 'path') spawnRandom(k, false); else P.alive[k] = 0;
+        continue;
+      }
+      P.x[k] = x; P.y[k] = y;
+      velAt(x, y); const sp = Math.sqrt(sv[0] * sv[0] + sv[1] * sv[1]);
+      const b = Math.min(NB - 1, (sp / vr * NB) | 0), n = segN[b]++, arr = segs[b];
+      arr[4 * n] = P.px[k]; arr[4 * n + 1] = P.py[k]; arr[4 * n + 2] = x; arr[4 * n + 3] = y;
+    }
+  }
+  function drawTrails() {
+    const W = trail.width, H = trail.height;
+    if (!S.paused) {
+      tctx.globalCompositeOperation = 'destination-out';
+      tctx.fillStyle = 'rgba(0,0,0,' + (S.tracer === 'smoke' ? 0.10 : 0.06) + ')'; tctx.fillRect(0, 0, W, H);
+    }
+    tctx.globalCompositeOperation = 'source-over'; tctx.lineCap = 'round';
+    tctx.lineWidth = (S.tracer === 'smoke' ? 1.5 : 1.3) * tdpr; tctx.globalAlpha = S.tracer === 'smoke' ? 0.85 : 0.8;
+    const tx = W / geom.Wd, ty = H / H2;
+    for (let b = 0; b < NB; b++) {
+      const n = segN[b]; if (!n) continue; const arr = segs[b];
+      tctx.strokeStyle = S.tracer === 'smoke' ? (b < 2 ? '#d8ecff' : BCOL[b]) : BCOL[b]; tctx.beginPath();
+      for (let q = 0; q < n; q++) { tctx.moveTo(arr[4 * q] * tx, H - arr[4 * q + 1] * ty); tctx.lineTo(arr[4 * q + 2] * tx, H - arr[4 * q + 3] * ty); }
+      tctx.stroke();
+    }
+    tctx.globalAlpha = 1;
+  }
+
+  /* ------------------------------ field painting ---------------------------- */
+  const SOLID_PX = (255 << 24) | (0x2a << 16) | (0x24 << 8) | 0x1e;
+  function computeT(mode) {                           // per-cell normalised scalar 0..1
+    const { fluid } = solver, G = geom, nx = G.nx, ny = G.nyT;
+    if (mode === 'schlieren') {
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        const k = j * nx + i; if (!fluid[k]) { tt[k] = 0; continue; }
+        const il = (i > 0 && fluid[k - 1]) ? k - 1 : k, ir = (i < nx - 1 && fluid[k + 1]) ? k + 1 : k;
+        const jd = (j > 0 && fluid[k - nx]) ? k - nx : k, ju = (j < ny - 1 && fluid[k + nx]) ? k + nx : k;
+        const gx = (cR[ir] - cR[il]) / Math.max(1e-6, G.xc[ir] - G.xc[il]), gy = (cR[ju] - cR[jd]) / Math.max(1e-6, G.yc[ju] - G.yc[jd]);
+        const gg = Math.sqrt(gx * gx + gy * gy) / Math.max(0.02, cR[k]);
+        tt[k] = 1 - Math.exp(-gg * 6 * G.dx);
+      }
+      return;
+    }
+    for (let k = 0; k < N; k++) {
+      if (!fluid[k]) { tt[k] = 0; continue; }
+      let t;
+      if (mode === 'mach') t = cM[k] / Mmax;
+      else if (mode === 'pressure') t = (Math.log10(Math.max(cP[k], 1e-6)) - lminP) / (-lminP);
+      else if (mode === 'temp') t = (cT[k] - 0.15) / 0.85;
+      else if (mode === 'density') t = (Math.log10(Math.max(cR[k], 1e-6)) - lminR) / (-lminR);
+      else t = Math.sqrt(cu[k] * cu[k] + cv[k] * cv[k]) / Vscale;
+      tt[k] = t < 0 ? 0 : (t > 1 ? 1 : t);
+    }
+  }
+  function paintField() {
+    const mode = S.field; computeT(mode);
+    const lut = mode === 'mach' ? LUT_MACH : mode === 'velocity' ? LUT_SPD : mode === 'schlieren' ? LUT_SCH : mode === 'pressure' ? LUT_PRES : mode === 'temp' ? LUT_TMP : LUT_RHO;
+    const { a, b, c, d, wx, wy } = LK, n = RW * RH;
+    for (let q = 0; q < n; q++) {
+      const ia = a[q]; if (ia < 0) { f32[q] = SOLID_PX; continue; }
+      const x = wx[q], y = wy[q], t = (tt[ia] * (1 - x) + tt[b[q]] * x) * (1 - y) + (tt[c[q]] * (1 - x) + tt[d[q]] * x) * y;
+      f32[q] = lut[(t * 255) | 0];
+    }
+    fctx.putImageData(fimg, 0, 0);
+  }
+
+  /* --------------------------- overlays: sonic line etc. -------------------- */
+  function drawSonic() {                // marching squares on the M = 1 contour over cell centres
+    const G = geom, nx = G.nx, ny = G.nyT, act = G.act, xc = G.xc, yc = G.yc;
+    bctx.beginPath();
+    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const k = j * nx + i; if (!act[k] || !act[k + 1] || !act[k + nx] || !act[k + nx + 1]) continue;
+      const a = cM[k] - 1, b = cM[k + 1] - 1, c = cM[k + nx + 1] - 1, d = cM[k + nx] - 1, pts = [];
+      const lerp = (k1, k2, f1, f2) => { const t = f1 / (f1 - f2); pts.push(xc[k1] + (xc[k2] - xc[k1]) * t, yc[k1] + (yc[k2] - yc[k1]) * t); };
+      if (a * b < 0) lerp(k, k + 1, a, b);
+      if (b * c < 0) lerp(k + 1, k + nx + 1, b, c);
+      if (d * c < 0) lerp(k + nx, k + nx + 1, d, c);
+      if (a * d < 0) lerp(k, k + nx, a, d);
+      if (pts.length >= 4) { bctx.moveTo(sx(pts[0]), sy(pts[1])); bctx.lineTo(sx(pts[2]), sy(pts[3])); }
+      if (pts.length >= 8) { bctx.moveTo(sx(pts[4]), sy(pts[5])); bctx.lineTo(sx(pts[6]), sy(pts[7])); }
+    }
+    bctx.strokeStyle = 'rgba(255,255,255,.9)'; bctx.lineWidth = 1.5; bctx.stroke();
+  }
+  function buildStreamlines() {
+    const path = new Path2D(), nS = 16, ds = 0.2, maxSteps = Math.ceil(2.4 * geom.Wd / ds);
+    for (let s = 0; s < nS; s++) {
+      let x = 0.35, y = geom.cy - geom.hin + 0.3 + (s + 0.5) * (2 * geom.hin - 0.6) / nS;
+      path.moveTo(sx(x), sy(y));
+      for (let n = 0; n < maxSteps; n++) {
+        velAt(x, y); let a = sv[0], b = sv[1], m = Math.sqrt(a * a + b * b); if (m < 0.004) break;
+        velAt(x + 0.5 * ds * a / m, y + 0.5 * ds * b / m); a = sv[0]; b = sv[1]; m = Math.sqrt(a * a + b * b); if (m < 0.004) break;
+        x += ds * a / m; y += ds * b / m;
+        if (x >= geom.Wd - 0.3 || !isFluid(x, y)) break;
+        path.lineTo(sx(x), sy(y));
+      }
+    }
+    return path;
+  }
+  function drawVectors() {
+    const step = 0.85, vr = vRef(); bctx.lineWidth = 1; bctx.strokeStyle = 'rgba(230,240,255,.75)'; bctx.beginPath();
+    for (let y = step / 2; y < H2; y += step) for (let x = step / 2; x < geom.Wd; x += step) {
+      if (!isFluid(x, y)) continue;
+      velAt(x, y); const L = step * 1.1 * kx, a = sv[0] / vr, b = sv[1] / vr;
+      const x0 = sx(x), y0 = sy(y), x1 = x0 + a * L, y1 = y0 - b * L, m = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
+      if (m < 1) continue;
+      const ux = (x1 - x0) / m, uy = (y1 - y0) / m, hl = Math.min(5, m * 0.4);
+      bctx.moveTo(x0, y0); bctx.lineTo(x1, y1);
+      bctx.moveTo(x1, y1); bctx.lineTo(x1 - hl * (ux + 0.5 * uy), y1 - hl * (uy - 0.5 * ux));
+      bctx.moveTo(x1, y1); bctx.lineTo(x1 - hl * (ux - 0.5 * uy), y1 - hl * (uy + 0.5 * ux));
+    }
+    bctx.stroke();
+  }
+  function drawBlock() {                // exact analytic nozzle wall over the raster
+    const cy = geom.cy, xe = geom.xe, he = geom.h(xe - 1e-6);
+    for (const sgn of [1, -1]) {
+      const edge = sgn > 0 ? H2 : 0;
+      bctx.beginPath(); bctx.moveTo(0, sy(edge));
+      for (let x = 0; x < xe; x += 0.1) bctx.lineTo(sx(x), sy(cy + sgn * geom.h(x)));
+      bctx.lineTo(sx(xe), sy(cy + sgn * he)); bctx.lineTo(sx(xe), sy(edge)); bctx.closePath();
+      bctx.fillStyle = '#161e29'; bctx.fill();
+      bctx.beginPath();
+      for (let x = 0; x < xe; x += 0.1) { const X = sx(x), Y = sy(cy + sgn * geom.h(x)); x ? bctx.lineTo(X, Y) : bctx.moveTo(X, Y); }
+      bctx.lineTo(sx(xe), sy(cy + sgn * he)); bctx.lineWidth = 2; bctx.strokeStyle = '#a9c0d8'; bctx.stroke();
+      bctx.beginPath(); bctx.moveTo(sx(xe), sy(cy + sgn * he)); bctx.lineTo(sx(xe), sy(edge)); bctx.lineWidth = 1.2; bctx.strokeStyle = '#5d7088'; bctx.stroke();
+    }
+  }
+  function drawTheoryMarks() {
+    const cy = geom.cy; bctx.font = '11px ui-monospace,Menlo,monospace';
+    const xt = sx(geom.xt);
+    if (geom.type !== 'conv') {
+      bctx.setLineDash([3, 4]); bctx.strokeStyle = 'rgba(255,179,71,.7)'; bctx.lineWidth = 1;
+      bctx.beginPath(); bctx.moveTo(xt, sy(cy + geom.ht + 0.6)); bctx.lineTo(xt, sy(cy - geom.ht - 0.6)); bctx.stroke();
+      bctx.setLineDash([]); bctx.fillStyle = 'rgba(255,179,71,.9)'; bctx.fillText('throat A*', xt - 24, sy(cy + geom.ht + 0.9));
+    }
+    if (TH.reg === 'shock' && TH.xShock > 0) {
+      const xs = sx(TH.xShock), hh = geom.h(TH.xShock);
+      bctx.setLineDash([5, 4]); bctx.strokeStyle = '#ffb347'; bctx.lineWidth = 2;
+      bctx.beginPath(); bctx.moveTo(xs, sy(cy + hh)); bctx.lineTo(xs, sy(cy - hh)); bctx.stroke(); bctx.setLineDash([]);
+      bctx.fillStyle = '#ffb347'; bctx.fillText('1-D shock M₁=' + TH.M1.toFixed(2), xs - 36, sy(cy - hh - 0.6));
+    }
+    bctx.fillStyle = 'rgba(160,190,220,.7)'; bctx.fillText('exit', sx(geom.xe) - 12, sy(cy - geom.he - 0.9));
+  }
+
+  /* --------------------------------- render --------------------------------- */
+  let hintOn = true, dragging = false;
+  function render() {
+    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bctx.fillStyle = '#090d13'; bctx.fillRect(0, 0, cssW, cssH);
+    if (S.field !== 'none') { paintField(); bctx.imageSmoothingEnabled = true; bctx.drawImage(fieldCanvas, 0, 0, cssW, cssH); }
+    else {
+      bctx.strokeStyle = 'rgba(80,110,150,.10)'; bctx.lineWidth = 1; bctx.beginPath();
+      for (let x = 0; x < cssW; x += cssH / 10) { bctx.moveTo(x, 0); bctx.lineTo(x, cssH); }
+      for (let y = 0; y < cssH; y += cssH / 10) { bctx.moveTo(0, y); bctx.lineTo(cssW, y); }
+      bctx.stroke();
+    }
+    if (S.streams) {
+      if (!streamPath || (++streamAge >= 3 && !S.paused)) { streamPath = buildStreamlines(); streamAge = 0; }
+      bctx.strokeStyle = 'rgba(255,255,255,.38)'; bctx.lineWidth = 1; bctx.stroke(streamPath);
+    }
+    if (S.vectors) drawVectors();
+    if (S.sonic && S.field !== 'none') drawSonic();
+    drawBlock();
+    if (S.theory) drawTheoryMarks();
+    if (geom.type !== 'conv' && (dragging || hintOn)) {
+      for (const sgn of [1, -1]) {
+        bctx.beginPath(); bctx.arc(sx(geom.xe), sy(geom.cy + sgn * geom.he), 6, 0, 2 * PI);
+        bctx.fillStyle = 'rgba(76,201,240,.35)'; bctx.fill(); bctx.strokeStyle = '#4cc9f0'; bctx.lineWidth = 1.5; bctx.stroke();
+      }
+    }
+    bctx.fillStyle = 'rgba(160,190,220,.75)'; bctx.font = '11px ui-monospace,Menlo,monospace';
+    bctx.fillText('reservoir p₀, T₀', 8, cssH - 10);
+    if (cssW - sx(geom.xe) > 400) bctx.fillText('p_b ambient chamber', sx(geom.xe) + 8, 18);
+  }
+
+  /* ------------------------------- HUD / legend ----------------------------- */
+  const fmt = (v, d) => isFinite(v) ? v.toFixed(d) : '–';
+  const fmtMd = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(2) + ' t/s' : v.toFixed(Math.abs(v) < 10 ? 2 : 1) + ' kg/s';
+  const fmtF = v => Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(2) + ' MN' : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(2) + ' kN' : v.toFixed(0) + ' N';
+  const fmtP = v => v >= 1e6 ? (v / 1e6).toFixed(2) + ' MPa' : (v / 1e3).toFixed(v < 1e4 ? 1 : 0) + ' kPa';
+  let lastHud = 0;
+  function updateHud(now, fps) {
+    if (now - lastHud < 180) return; lastHud = now;
+    const u = units(), gas = gasOf(), th = TH;
+    $('hNpr').textContent = S.npr.toFixed(S.npr < 10 ? 3 : 2);
+    $('hP').textContent = fmtP(u.p0) + ' · ' + fmtP(u.pb); $('hT').textContent = u.T0.toFixed(0) + ' K · ' + gas.name;
+    $('sMt').textContent = fmt(diag.Mt, 2); $('tMt').textContent = fmt(th.Mt, 2);
+    $('sMe').textContent = fmt(diag.Me, 2); $('tMe').textContent = fmt(th.Me, 2);
+    $('sVe').textContent = (diag.Ve * u.a0).toFixed(0) + ' m/s'; $('tVe').textContent = (th.Ve * u.a0).toFixed(0);
+    $('sMd').textContent = fmtMd(diag.md * u.rho0 * u.a0 * u.delta); $('tMd').textContent = fmtMd(th.mdot * u.rho0 * u.a0 * u.delta);
+    $('sF').textContent = fmtF(diag.F * u.pref * u.delta); $('tF').textContent = fmtF(th.F * u.pref * u.delta);
+    $('sCf').textContent = fmt(diag.F * gas.g / geom.At, 2); $('tCf').textContent = fmt(th.CF, 2);
+    $('hReg').textContent = REGIMES[th.reg];
+    $('hCrit').textContent = 'A_e/A_t ' + th.AR.toFixed(2) + ' · NPR crit I ' + th.npr1.toFixed(3) + ' · II ' + th.npr2.toFixed(2) + ' · design ' + th.nprD.toFixed(2) + ' · M_e,design ' + th.MeSup.toFixed(2);
+    $('hGrid').textContent = geom.nx + '×' + geom.nyT + ' cells · ' + fps.toFixed(0) + ' fps · t = ' + solver.t.toFixed(0) + ' · Δ ' + (u.delta * 1000).toFixed(1) + ' mm/unit';
+  }
+  function updateLegend() {
+    if (!geom) return;
+    const lg = $('lgBar'), c = lg.getContext('2d'), id = c.createImageData(128, 1), v32 = new Uint32Array(id.data.buffer);
+    const f = S.field; $('legend').style.display = f === 'none' ? 'none' : 'block';
+    const lut = f === 'mach' ? LUT_MACH : f === 'velocity' ? LUT_SPD : f === 'schlieren' ? LUT_SCH : f === 'pressure' ? LUT_PRES : f === 'temp' ? LUT_TMP : LUT_RHO;
+    for (let i = 0; i < 128; i++) v32[i] = lut[(i / 127 * 255) | 0];
+    if (f === 'mach') { const x = Math.round(127 / Mmax); v32[x] = 0xffffffff; }
+    c.putImageData(id, 0, 0);
+    const a0 = units().a0, T = {
+      mach: ['Mach number', '0 (white tick = sonic)', '', Mmax.toFixed(1)],
+      pressure: ['Static pressure p/p₀ (log)', (Math.pow(10, lminP)).toFixed(3), '', '1 (p₀)'],
+      temp: ['Static temperature T/T₀', '0.15', '', '1.0'],
+      density: ['Density ρ/ρ₀ (log)', (Math.pow(10, lminR)).toFixed(3), '', '1'],
+      velocity: ['Speed |V| (m/s)', '0', '', (Vscale * a0).toFixed(0)],
+      schlieren: ['Schlieren |∇ρ|/ρ', 'smooth', '', 'shock / sharp']
+    }[f];
+    if (T) { $('lgTitle').textContent = T[0]; $('lgA').textContent = T[1]; $('lgB').textContent = T[2]; $('lgC').textContent = T[3]; }
+  }
+
+  /* ------------------------ centre-line plot (sim vs 1-D) ------------------- */
+  let plotTick = 0;
+  function drawPlot() {
+    if (!S.plotOn || (++plotTick % 5)) return;
+    const W = plot.width, H = plot.height, mach = S.plotMode === 'mach', G = geom, nx = G.nx;
+    pctx.setTransform(1, 0, 0, 1, 0, 0); pctx.clearRect(0, 0, W, H);
+    const L = 30 * pdpr, R = 6 * pdpr, T = 14 * pdpr, B = 12 * pdpr, pw = W - L - R, ph = H - T - B, lmin = lminP;
+    const yv = v => mach ? clamp(v / Mmax, 0, 1) : clamp((Math.log10(Math.max(v, 1e-6)) - lmin) / (-lmin), 0, 1);
+    const X = x => L + x / G.Wd * pw, Y = v => T + (1 - yv(v)) * ph;
+    pctx.font = (9.5 * pdpr) + 'px ui-monospace,Menlo,monospace'; pctx.fillStyle = '#7f93aa'; pctx.strokeStyle = 'rgba(80,110,150,.35)'; pctx.lineWidth = pdpr;
+    pctx.fillText(mach ? 'centre-line Mach · tap: p/p₀' : 'centre-line p/p₀ · tap: Mach', L, 10 * pdpr);
+    pctx.strokeRect(L, T, pw, ph);
+    const ticks = mach ? [0, 1, Math.floor(Mmax)] : [1, 0.1, 0.01].filter(v => Math.log10(v) > lmin);
+    for (const tv of ticks) { const y = Y(tv); pctx.beginPath(); pctx.moveTo(L, y); pctx.lineTo(L + pw, y); pctx.stroke(); pctx.fillText(String(tv), 3 * pdpr, y + 3 * pdpr); }
+    pctx.setLineDash([3 * pdpr, 3 * pdpr]); pctx.beginPath(); pctx.moveTo(X(G.xe), T); pctx.lineTo(X(G.xe), T + ph); pctx.stroke();
+    pctx.beginPath(); pctx.moveTo(X(G.xt), T); pctx.lineTo(X(G.xt), T + ph); pctx.stroke(); pctx.setLineDash([]);
+    const arr = mach ? cM : cP, ja = G.mOut + G.mIn - 1, jb = ja + 1; pctx.beginPath();
+    for (let i = 1; i < nx - 1; i++) {
+      const v = 0.5 * (arr[ja * nx + i] + arr[jb * nx + i]), x = X((i + 0.5) * G.dx), y = Y(v); i === 1 ? pctx.moveTo(x, y) : pctx.lineTo(x, y);
+    }
+    pctx.strokeStyle = '#4cc9f0'; pctx.lineWidth = 1.8 * pdpr; pctx.stroke();
+    const cv2 = mach ? TH.curveM : TH.curveP; pctx.beginPath(); pctx.setLineDash([4 * pdpr, 3 * pdpr]);
+    for (let i = 0; i < cv2.length; i++) {
+      const x = X((i + 0.5) * G.dx), y = Y(cv2[i]);
+      if (i === 0 || (TH.iShock >= 0 && i === TH.iShock)) pctx.moveTo(x, y); else pctx.lineTo(x, y);
+    }
+    pctx.strokeStyle = '#ffb347'; pctx.lineWidth = 1.5 * pdpr; pctx.stroke(); pctx.setLineDash([]);
+    if (!mach) { const yb = Y(1 / S.npr); pctx.strokeStyle = 'rgba(255,107,107,.7)'; pctx.beginPath(); pctx.moveTo(L, yb); pctx.lineTo(L + pw, yb); pctx.stroke(); pctx.fillStyle = '#ff6b6b'; pctx.fillText('p_b', L + pw - 14 * pdpr, yb - 2 * pdpr); }
+    pctx.fillStyle = '#4cc9f0'; pctx.fillText('sim', L + pw - 58 * pdpr, T + 10 * pdpr);
+    pctx.fillStyle = '#ffb347'; pctx.fillText('1-D', L + pw - 30 * pdpr, T + 10 * pdpr);
+  }
+  plot.addEventListener('click', () => { S.plotMode = S.plotMode === 'mach' ? 'p' : 'mach'; plotTick = 99; });
+
+  /* ---------------------------- UI bindings --------------------------------- */
+  const NPR_MIN = 1.003, NPR_MAX = 150;
+  const nprFromSlider = v => Math.exp(Math.log(NPR_MIN) + (Math.log(NPR_MAX) - Math.log(NPR_MIN)) * v / 1000);
+  const sliderFromNpr = n => Math.round(1000 * (Math.log(n) - Math.log(NPR_MIN)) / (Math.log(NPR_MAX) - Math.log(NPR_MIN)));
+  function syncUi() {
+    $('arV').textContent = (geom.Ae / geom.At).toFixed(2);
+    $('ar').disabled = S.type === 'conv';
+    $('nprV').textContent = S.npr.toFixed(S.npr < 10 ? 3 : 2); $('npr').value = sliderFromNpr(S.npr);
+    $('p0V').textContent = S.p0 + ' kPa'; $('T0V').textContent = S.T0 + ' K'; $('wtV').textContent = S.wt + ' mm';
+    $('nprNote').textContent = 'p_b = ' + (S.p0 / S.npr).toFixed(1) + ' kPa. Presets are placed from the 1-D critical pressure ratios of the current geometry.';
+  }
+  function setNpr(n) {
+    const wasSub = TH && TH.reg === 'sub';
+    S.npr = clamp(n, NPR_MIN, NPR_MAX); solver.setNPR(S.npr); applyTheory();
+    if (TH.reg === 'sub' && !wasSub) solver.reset(TH);       // unchoking needs a fresh subsonic start (otherwise it drains very slowly)
+    syncUi();
+  }
+  function setAr(a) { S.ar = clamp(Math.round(a * 20) / 20, 1, 5); $('ar').value = S.ar; geomDirty = true; }
+  function presetNpr(kind) {
+    const g = gasOf().g, th = TH, At = geom.At, Ae = geom.Ae; let n = th.nprD;
+    if (kind === 'sub') { const r = AoverAstar(0.6, g), Me = machFromArea(r * Ae / At, g, false); n = 1 / pRatio(Me, g); }
+    else if (kind === 'shock') {
+      const M1 = 1 + 0.5 * (th.MeSup - 1), M2 = shockM2(M1, g), r1 = AoverAstar(M1, g), Re = th.AR * AoverAstar(M2, g) / r1;
+      n = 1 / (shockP0(M1, g) * pRatio(machFromArea(Re, g, false), g));
+    } else if (kind === 'over') n = th.npr2 + 0.55 * (th.nprD - th.npr2);
+    else if (kind === 'under') n = th.nprD * 2.5;
+    setNpr(n);
+  }
+  $('ntype').onchange = e => { S.type = e.target.value; geomDirty = true; };
+  $('ar').oninput = e => setAr(+e.target.value);
+  document.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => setAr(+b.dataset.ar));
+  $('wt').oninput = e => { S.wt = +e.target.value; $('wtV').textContent = S.wt + ' mm'; };
+  $('gas').onchange = e => { S.gas = e.target.value; solver.setGas(gasOf().g); solver.setNPR(S.npr); applyTheory(); solver.reset(TH); initParticles(); };
+  $('p0').oninput = e => { S.p0 = +e.target.value; $('p0V').textContent = S.p0 + ' kPa'; syncUi(); };
+  $('T0').oninput = e => { S.T0 = +e.target.value; $('T0V').textContent = S.T0 + ' K'; };
+  $('npr').oninput = e => setNpr(nprFromSlider(+e.target.value));
+  document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => presetNpr(b.dataset.reg));
+  $('field').onchange = e => { S.field = e.target.value; updateLegend(); };
+  $('tracer').onchange = e => { S.tracer = e.target.value; initParticles(); };
+  $('sonic').onchange = e => S.sonic = e.target.checked;
+  $('theory').onchange = e => S.theory = e.target.checked;
+  $('stream').onchange = e => { S.streams = e.target.checked; streamPath = null; };
+  $('vec').onchange = e => S.vectors = e.target.checked;
+  $('order2').onchange = e => { S.order2 = e.target.checked; solver.order = S.order2 ? 2 : 1; };
+  $('quality').onchange = e => { if (e.target.value === 'auto') S.auto = true; else { S.auto = false; S.tier = +e.target.value; rebuild(); } };
+  $('pause').onclick = () => { S.paused = !S.paused; $('pause').textContent = S.paused ? '▶ Resume' : '⏸ Pause'; };
+  $('reset').onclick = () => restart();
+  $('menuBtn').onclick = () => { $('panel').classList.toggle('hidden'); setTimeout(onResize, 30); };
+  $('hudBtn').onclick = () => { S.hudOn = !S.hudOn; $('hud').classList.toggle('off', !S.hudOn); };
+  $('plotBtn').onclick = () => { S.plotOn = !S.plotOn; $('plotWrap').classList.toggle('on', S.plotOn); if (S.plotOn) { resizeCanvasesPlotOnly(); plotTick = 99; } };
+  function resizeCanvasesPlotOnly() { pdpr = Math.min(window.devicePixelRatio || 1, 2); plot.width = Math.round(plot.clientWidth * pdpr) || 260; plot.height = Math.round(plot.clientHeight * pdpr) || 112; }
+  $('plotWrap').classList.toggle('on', S.plotOn);
+  $('rotOk').onclick = () => $('rotate').classList.remove('on');
+  $('full').onclick = () => {
+    const el = document.documentElement;
+    (el.requestFullscreen ? el.requestFullscreen() : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : Promise.reject()))
+      .then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
+  };
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'SELECT') return;
+    if (e.key === 'ArrowUp') { setNpr(S.npr * 1.06); e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { setNpr(S.npr / 1.06); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { setAr(S.ar + 0.1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { setAr(S.ar - 0.1); e.preventDefault(); }
+    else if (e.key === ' ') { $('pause').click(); e.preventDefault(); }
+  });
+
+  /* ---------------- drag the exit lip to change the area ratio -------------- */
+  const toSim = e => { const r = trail.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * geom.Wd, H2 - (e.clientY - r.top) / r.height * H2]; };
+  trail.addEventListener('pointerdown', e => {
+    if (geom.type === 'conv') return;
+    const [x, y] = toSim(e), px = Math.abs(x - geom.xe) * kx, py = (Math.abs(y - geom.cy) - geom.he) * ky;
+    if (px < 26 && Math.abs(py) < 26) { dragging = true; trail.setPointerCapture(e.pointerId); trail.classList.add('drag'); hintOn = false; $('hint').style.opacity = 0; }
+  });
+  trail.addEventListener('pointermove', e => { if (!dragging) return; const [, y] = toSim(e); setAr(Math.abs(y - geom.cy) / geom.ht); });
+  const endDrag = () => { dragging = false; trail.classList.remove('drag'); };
+  trail.addEventListener('pointerup', endDrag); trail.addEventListener('pointercancel', endDrag);
+  setTimeout(() => { hintOn = false; $('hint').style.opacity = 0; }, 8000);
+
+  let rzT = 0;
+  function onResize() { clearTimeout(rzT); rzT = setTimeout(rebuild, 200); }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+  document.addEventListener('visibilitychange', () => { lastT = performance.now(); });
+
+  /* ------------------------ main loop + auto quality ------------------------ */
+  let lastT = performance.now(), fpsE = 60, workE = 8, lowT = 0, highT = 0, cool = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (document.hidden) return;
+    const dtMs = Math.min(100, now - lastT); lastT = now;
+    if (dtMs > 0) fpsE += (1000 / dtMs - fpsE) * 0.06;
+    const w0 = performance.now();
+    if (geomDirty) applyGeom();
+    if (thDirty) applyTheory();
+    if (!S.paused) { stepSim(); updateParticles(); }
+    render(); drawTrails(); drawPlot();
+    workE += (performance.now() - w0 - workE) * 0.08;
+    updateHud(now, fpsE);
+    if (S.auto && now > cool && !S.paused) {
+      if (fpsE < 46) { lowT += dtMs; highT = 0; } else if (fpsE > 56 && workE < 7.5) { highT += dtMs; lowT = 0; } else { lowT = highT = 0; }
+      if (lowT > 2200 && S.tier > 0) { S.tier--; lowT = 0; cool = now + 5000; rebuild(); }
+      else if (highT > 8000 && S.tier < (isMobile ? 2 : 3)) { S.tier++; highT = 0; cool = now + 8000; rebuild(); }
+    }
+  }
+
+  function setupPWA() {
+    let deferred = null;
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; $('install').style.display = 'block'; });
+    $('install').onclick = () => { if (deferred) { deferred.prompt(); deferred = null; $('install').style.display = 'none'; } };
+    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+    try { if (screen.orientation && screen.orientation.lock && matchMedia('(display-mode: standalone)').matches) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}
+  }
+
+  setupPWA(); rebuild();
+  requestAnimationFrame(frame);
+  window.__nozzle = { S, get solver() { return solver; }, get TH() { return TH; }, get geom() { return geom; } };
+}
+
+if (typeof window === 'undefined') {
+  module.exports = { NozzleSolver, buildGeom, computeTheory, machFromArea, AoverAstar, pRatio, tRatio, shockP, shockM2, shockP0, GASES };
+} else {
+  window.addEventListener('DOMContentLoaded', main);
+}
+</script>
+</body>
+</html>
