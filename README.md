@@ -2,7 +2,7 @@
 
 Real-time 2D converging-diverging (de Laval) nozzle CFD in the browser (no dependencies). A compressible Euler solver on a body-fitted grid shows the throat, normal shock, oblique shocks and Mach diamonds, with live comparison against 1-D isentropic theory.
 
-**Live demo:** https://bhargavd1501.github.io/Nozzle-test/  *(change to your repo name)*
+**Live demo:** https://bhargavd1501.github.io/Nozzle-Simulator/  *(change to your repo name)*
 
 - Nozzle types: conical, bell (parabolic), contoured S-curve, dual-bell, convergent-only
 - Area ratio 1–5 (slider, presets, or drag the exit lip), throat width 10–300 mm
