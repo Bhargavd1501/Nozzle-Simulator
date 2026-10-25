@@ -148,6 +148,13 @@ input[type=range]:disabled{opacity:.4}
 
     <div class="sec">
       <h2>Visualisation</h2>
+      <label>View (drag to pan · pinch / wheel to zoom)</label>
+      <select id="view">
+        <option value="exit" selected>Exit + plume (shock diamonds)</option>
+        <option value="noz">Whole nozzle + near plume</option>
+        <option value="far">Far plume</option>
+        <option value="full">Whole chamber</option>
+      </select>
       <label>Field overlay</label>
       <select id="field">
         <option value="mach" selected>Mach number</option>
@@ -212,7 +219,7 @@ input[type=range]:disabled{opacity:.4}
     </div>
     <div id="legend"><div id="lgTitle">Mach</div><canvas id="lgBar" width="128" height="1"></canvas><div class="lb"><span id="lgA"></span><span id="lgB"></span><span id="lgC"></span></div></div>
     <div id="plotWrap"><canvas id="plot"></canvas></div>
-    <div id="hint">Drag the nozzle exit lip to change area ratio · ↑/↓ NPR · ←/→ area ratio · Space pauses</div>
+    <div id="hint">Drag to pan · pinch/wheel to zoom · drag the nozzle exit lip to change area ratio · ↑/↓ NPR · ←/→ area ratio · Space pauses</div>
   </main>
 </div>
 
@@ -259,12 +266,12 @@ function machFromArea(r, g, sup) {
 const TIERS = [
   { dx: 0.34, mIn: 7, mOut: 5 }, { dx: 0.26, mIn: 9, mOut: 6 }, { dx: 0.19, mIn: 12, mOut: 8 }, { dx: 0.14, mIn: 16, mOut: 10 }
 ];
-const HH = 7, HT = 1, HIN = 3.4;
+const HH = 7, HT = 1, HIN = 3.4, OUTP = 1.7, WD = 46, XT = 3.2, XE = 10.0;       // OUTP: outer rows are clustered towards the jet
 
 function buildGeom(aspect, tier, type, arReq) {
-  const T = TIERS[tier], cy = HH, Wd = 2 * HH * aspect;
+  const T = TIERS[tier], cy = HH, Wd = WD;
   const nx = Math.round(Wd / T.dx), dx = Wd / nx, mIn = T.mIn, mOut = T.mOut, nyT = 2 * (mIn + mOut);
-  const ixT = Math.round(0.22 * nx), IE = Math.round(0.62 * nx), xt = ixT * dx, xe = IE * dx, Ld = xe - xt;
+  const ixT = Math.round(XT / dx), IE = Math.round(XE / dx), xt = ixT * dx, xe = IE * dx, Ld = xe - xt;
   const ht = HT, hin = HIN, he = type === 'conv' ? ht : clamp(arReq, 1, 5) * ht, dh = he - ht;
   const h = x => {
     if (x < xt) return ht + (hin - ht) * 0.5 * (1 + Math.cos(PI * x / xt));
@@ -285,9 +292,9 @@ function buildGeom(aspect, tier, type, arReq) {
     const H = Hv[i];
     for (let jv = 0; jv <= nyT; jv++) {
       let y;
-      if (jv <= mOut) y = (cy - H) * (jv / mOut);
+      if (jv <= mOut) y = (cy - H) * (1 - Math.pow(1 - jv / mOut, OUTP));
       else if (jv <= mOut + 2 * mIn) y = cy + H * ((jv - mOut) / mIn - 1);
-      else y = cy + H + (2 * HH - (cy + H)) * ((jv - mOut - 2 * mIn) / mOut);
+      else y = cy + H + (2 * HH - (cy + H)) * Math.pow((jv - mOut - 2 * mIn) / mOut, OUTP);
       yv[jv * nv + i] = y;
     }
   }
@@ -544,7 +551,7 @@ function main() {
     type: 'bell', ar: 3, gas: 'air', p0: 500, T0: 600, wt: 50, npr: 20,
     field: 'mach', tracer: 'smoke', sonic: true, theory: true, streams: false, vectors: false,
     plotOn: !smallScreen, plotMode: 'mach', hudOn: true, auto: true, tier: isMobile ? 1 : 2,
-    order2: !isMobile, paused: false
+    order2: true, paused: false
   };
   $('order2').checked = S.order2;
   if (smallScreen) $('panel').classList.add('hidden');
@@ -569,8 +576,22 @@ function main() {
     plot.width = Math.round(plot.clientWidth * pdpr) || 260; plot.height = Math.round(plot.clientHeight * pdpr) || 112;
     streamPath = null;
   }
-  function updateScale() { kx = cssW / geom.Wd; ky = cssH / H2; }
-  const sx = x => x * kx, sy = y => cssH - y * ky;
+  /* view window: ww = visible width in length units, vx0 = left edge; vertically centred on the nozzle axis */
+  const view = { mode: 'exit', ww: 30, vx0: 6, dirty: false };
+  let vy0 = 0;
+  function clampView() {
+    view.ww = clamp(view.ww, 6, geom.Wd); view.vx0 = clamp(view.vx0, 0, geom.Wd - view.ww);
+  }
+  function setViewMode(m) {
+    view.mode = m; const W = geom.Wd, xe = geom.xe;
+    if (m === 'exit') { view.ww = 30; view.vx0 = xe - 4; }
+    else if (m === 'noz') { view.ww = 30; view.vx0 = 0; }
+    else if (m === 'far') { view.ww = 24; view.vx0 = W - 24; }
+    else { view.ww = W; view.vx0 = 0; }
+    clampView(); view.dirty = true;
+  }
+  function updateScale() { clampView(); kx = ky = cssW / view.ww; vy0 = geom.cy - cssH / (2 * ky); }
+  const sx = x => (x - view.vx0) * kx, sy = y => cssH - (y - vy0) * ky;
 
   /* geometry (re)build: cheap, so it can run every frame while dragging the lip */
   function makeGeom() { geom = buildGeom(aspect, S.tier, S.type, S.ar); }
@@ -581,6 +602,7 @@ function main() {
     cM = new Float32Array(N); cP = new Float32Array(N); cT = new Float32Array(N); cR = new Float32Array(N);
     cu = new Float32Array(N); cv = new Float32Array(N); tt = new Float32Array(N);
     solver = new NozzleSolver(geom, gasOf().g); solver.order = S.order2 ? 2 : 1;
+    if (firstBuild) setViewMode(view.mode);
     updateScale();
     TH = computeTheory(gasOf().g, geom, S.npr);
     if (firstBuild) { S.npr = TH.nprD; firstBuild = false; }
@@ -637,7 +659,8 @@ function main() {
     const n = RW * RH;
     LK = { a: new Int32Array(n), b: new Int32Array(n), c: new Int32Array(n), d: new Int32Array(n), wx: new Float32Array(n), wy: new Float32Array(n) };
     for (let py = 0; py < RH; py++) for (let px = 0; px < RW; px++) {
-      const q = py * RW + px, x = (px + 0.5) / RW * geom.Wd, y = (1 - (py + 0.5) / RH) * H2;
+      const q = py * RW + px, x = view.vx0 + (px + 0.5) / RW * view.ww, y = vy0 + (1 - (py + 0.5) / RH) * cssH / ky;
+      if (x < 0 || x > geom.Wd || y < 0 || y > H2) { LK.a[q] = -2; continue; }
       if (!isFluid(x, y)) { LK.a[q] = -1; continue; }
       locate(x, y); LK.a[q] = loc.a; LK.b[q] = loc.b; LK.c[q] = loc.c; LK.d[q] = loc.d; LK.wx[q] = loc.wx; LK.wy[q] = loc.wy;
     }
@@ -681,14 +704,14 @@ function main() {
   }
   function spawnRandom(k, anywhere) {
     for (let tries = 0; tries < 10; tries++) {
-      const x = anywhere ? Math.random() * geom.Wd * 0.98 : 0.15 + Math.random() * 0.5;
-      const y = anywhere ? 0.1 + Math.random() * (H2 - 0.2) : geom.cy + (Math.random() * 2 - 1) * (geom.hin - 0.4);
+      const x = anywhere ? view.vx0 + Math.random() * view.ww * 0.98 : 0.15 + Math.random() * 0.5;
+      const y = anywhere ? geom.cy + (Math.random() * 2 - 1) * Math.min(HH - 0.2, cssH / ky / 2) : geom.cy + (Math.random() * 2 - 1) * (geom.hin - 0.4);
       if (isFluid(x, y)) { P.x[k] = x; P.y[k] = y; break; }
       P.x[k] = 0.2; P.y[k] = geom.cy;
     }
     P.px[k] = P.x[k]; P.py[k] = P.y[k]; P.age[k] = 0; P.alive[k] = 1;
   }
-  const tracerSpeed = () => 0.012 * geom.Wd;                           // length units per frame per unit (non-dim) velocity
+  const tracerSpeed = () => 0.3;                                 // length units per frame per unit (non-dim) velocity
   function vRef() { return Math.max(1.2, TH.Ve > 0 ? Math.max(TH.Ve, 1) * 1.05 : 1.2, 0.9 * Vscale * 0.6); }
   function updateParticles() {
     if (!P.cap) return;
@@ -729,18 +752,18 @@ function main() {
     }
     tctx.globalCompositeOperation = 'source-over'; tctx.lineCap = 'round';
     tctx.lineWidth = (S.tracer === 'smoke' ? 1.5 : 1.3) * tdpr; tctx.globalAlpha = S.tracer === 'smoke' ? 0.85 : 0.8;
-    const tx = W / geom.Wd, ty = H / H2;
+    const tm = W / cssW * kx, tx0 = view.vx0, ty0 = vy0;
     for (let b = 0; b < NB; b++) {
       const n = segN[b]; if (!n) continue; const arr = segs[b];
       tctx.strokeStyle = S.tracer === 'smoke' ? (b < 2 ? '#d8ecff' : BCOL[b]) : BCOL[b]; tctx.beginPath();
-      for (let q = 0; q < n; q++) { tctx.moveTo(arr[4 * q] * tx, H - arr[4 * q + 1] * ty); tctx.lineTo(arr[4 * q + 2] * tx, H - arr[4 * q + 3] * ty); }
+      for (let q = 0; q < n; q++) { tctx.moveTo((arr[4 * q] - tx0) * tm, H - (arr[4 * q + 1] - ty0) * tm); tctx.lineTo((arr[4 * q + 2] - tx0) * tm, H - (arr[4 * q + 3] - ty0) * tm); }
       tctx.stroke();
     }
     tctx.globalAlpha = 1;
   }
 
   /* ------------------------------ field painting ---------------------------- */
-  const SOLID_PX = (255 << 24) | (0x2a << 16) | (0x24 << 8) | 0x1e;
+  const SOLID_PX = (255 << 24) | (0x2a << 16) | (0x24 << 8) | 0x1e, VOID_PX = (255 << 24) | (0x13 << 16) | (0x0d << 8) | 0x09;
   function computeT(mode) {                           // per-cell normalised scalar 0..1
     const { fluid } = solver, G = geom, nx = G.nx, ny = G.nyT;
     if (mode === 'schlieren') {
@@ -750,7 +773,7 @@ function main() {
         const jd = (j > 0 && fluid[k - nx]) ? k - nx : k, ju = (j < ny - 1 && fluid[k + nx]) ? k + nx : k;
         const gx = (cR[ir] - cR[il]) / Math.max(1e-6, G.xc[ir] - G.xc[il]), gy = (cR[ju] - cR[jd]) / Math.max(1e-6, G.yc[ju] - G.yc[jd]);
         const gg = Math.sqrt(gx * gx + gy * gy) / Math.max(0.02, cR[k]);
-        tt[k] = 1 - Math.exp(-gg * 6 * G.dx);
+        tt[k] = 1 - Math.exp(-gg * 10 * G.dx);
       }
       return;
     }
@@ -770,7 +793,7 @@ function main() {
     const lut = mode === 'mach' ? LUT_MACH : mode === 'velocity' ? LUT_SPD : mode === 'schlieren' ? LUT_SCH : mode === 'pressure' ? LUT_PRES : mode === 'temp' ? LUT_TMP : LUT_RHO;
     const { a, b, c, d, wx, wy } = LK, n = RW * RH;
     for (let q = 0; q < n; q++) {
-      const ia = a[q]; if (ia < 0) { f32[q] = SOLID_PX; continue; }
+      const ia = a[q]; if (ia < 0) { f32[q] = ia === -2 ? VOID_PX : SOLID_PX; continue; }
       const x = wx[q], y = wy[q], t = (tt[ia] * (1 - x) + tt[b[q]] * x) * (1 - y) + (tt[c[q]] * (1 - x) + tt[d[q]] * x) * y;
       f32[q] = lut[(t * 255) | 0];
     }
@@ -810,8 +833,8 @@ function main() {
     return path;
   }
   function drawVectors() {
-    const step = 0.85, vr = vRef(); bctx.lineWidth = 1; bctx.strokeStyle = 'rgba(230,240,255,.75)'; bctx.beginPath();
-    for (let y = step / 2; y < H2; y += step) for (let x = step / 2; x < geom.Wd; x += step) {
+    const step = clamp(30 / kx, 0.4, 2.5), vr = vRef(), xa = Math.max(0, view.vx0), xb = Math.min(geom.Wd, view.vx0 + view.ww), ya = Math.max(0, vy0), yb = Math.min(H2, vy0 + cssH / ky); bctx.lineWidth = 1; bctx.strokeStyle = 'rgba(230,240,255,.75)'; bctx.beginPath();
+    for (let y = Math.ceil(ya / step) * step + step / 2; y < yb; y += step) for (let x = Math.ceil(xa / step) * step + step / 2; x < xb; x += step) {
       if (!isFluid(x, y)) continue;
       velAt(x, y); const L = step * 1.1 * kx, a = sv[0] / vr, b = sv[1] / vr;
       const x0 = sx(x), y0 = sy(y), x1 = x0 + a * L, y1 = y0 - b * L, m = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
@@ -827,7 +850,7 @@ function main() {
     const cy = geom.cy, xe = geom.xe, he = geom.h(xe - 1e-6);
     for (const sgn of [1, -1]) {
       const edge = sgn > 0 ? H2 : 0;
-      bctx.beginPath(); bctx.moveTo(0, sy(edge));
+      bctx.beginPath(); bctx.moveTo(sx(0), sy(edge));
       for (let x = 0; x < xe; x += 0.1) bctx.lineTo(sx(x), sy(cy + sgn * geom.h(x)));
       bctx.lineTo(sx(xe), sy(cy + sgn * he)); bctx.lineTo(sx(xe), sy(edge)); bctx.closePath();
       bctx.fillStyle = '#161e29'; bctx.fill();
@@ -881,8 +904,8 @@ function main() {
       }
     }
     bctx.fillStyle = 'rgba(160,190,220,.75)'; bctx.font = '11px ui-monospace,Menlo,monospace';
-    bctx.fillText('reservoir p₀, T₀', 8, cssH - 10);
-    if (cssW - sx(geom.xe) > 400) bctx.fillText('p_b ambient chamber', sx(geom.xe) + 8, 18);
+    if (view.vx0 < 1) bctx.fillText('reservoir p₀, T₀', 8, cssH - 10);
+    if (cssW - sx(geom.xe) > 400) bctx.fillText('p_b ambient chamber', Math.max(8, sx(geom.xe) + 8), 18);
   }
 
   /* ------------------------------- HUD / legend ----------------------------- */
@@ -933,7 +956,7 @@ function main() {
     pctx.setTransform(1, 0, 0, 1, 0, 0); pctx.clearRect(0, 0, W, H);
     const L = 30 * pdpr, R = 6 * pdpr, T = 14 * pdpr, B = 12 * pdpr, pw = W - L - R, ph = H - T - B, lmin = lminP;
     const yv = v => mach ? clamp(v / Mmax, 0, 1) : clamp((Math.log10(Math.max(v, 1e-6)) - lmin) / (-lmin), 0, 1);
-    const X = x => L + x / G.Wd * pw, Y = v => T + (1 - yv(v)) * ph;
+    const X = x => L + (x - view.vx0) / view.ww * pw, Y = v => T + (1 - yv(v)) * ph;
     pctx.font = (9.5 * pdpr) + 'px ui-monospace,Menlo,monospace'; pctx.fillStyle = '#7f93aa'; pctx.strokeStyle = 'rgba(80,110,150,.35)'; pctx.lineWidth = pdpr;
     pctx.fillText(mach ? 'centre-line Mach · tap: p/p₀' : 'centre-line p/p₀ · tap: Mach', L, 10 * pdpr);
     pctx.strokeRect(L, T, pw, ph);
@@ -942,6 +965,7 @@ function main() {
     pctx.setLineDash([3 * pdpr, 3 * pdpr]); pctx.beginPath(); pctx.moveTo(X(G.xe), T); pctx.lineTo(X(G.xe), T + ph); pctx.stroke();
     pctx.beginPath(); pctx.moveTo(X(G.xt), T); pctx.lineTo(X(G.xt), T + ph); pctx.stroke(); pctx.setLineDash([]);
     const arr = mach ? cM : cP, ja = G.mOut + G.mIn - 1, jb = ja + 1; pctx.beginPath();
+    pctx.save(); pctx.beginPath(); pctx.rect(L, 0, pw, H); pctx.clip(); pctx.beginPath();
     for (let i = 1; i < nx - 1; i++) {
       const v = 0.5 * (arr[ja * nx + i] + arr[jb * nx + i]), x = X((i + 0.5) * G.dx), y = Y(v); i === 1 ? pctx.moveTo(x, y) : pctx.lineTo(x, y);
     }
@@ -951,7 +975,7 @@ function main() {
       const x = X((i + 0.5) * G.dx), y = Y(cv2[i]);
       if (i === 0 || (TH.iShock >= 0 && i === TH.iShock)) pctx.moveTo(x, y); else pctx.lineTo(x, y);
     }
-    pctx.strokeStyle = '#ffb347'; pctx.lineWidth = 1.5 * pdpr; pctx.stroke(); pctx.setLineDash([]);
+    pctx.strokeStyle = '#ffb347'; pctx.lineWidth = 1.5 * pdpr; pctx.stroke(); pctx.setLineDash([]); pctx.restore();
     if (!mach) { const yb = Y(1 / S.npr); pctx.strokeStyle = 'rgba(255,107,107,.7)'; pctx.beginPath(); pctx.moveTo(L, yb); pctx.lineTo(L + pw, yb); pctx.stroke(); pctx.fillStyle = '#ff6b6b'; pctx.fillText('p_b', L + pw - 14 * pdpr, yb - 2 * pdpr); }
     pctx.fillStyle = '#4cc9f0'; pctx.fillText('sim', L + pw - 58 * pdpr, T + 10 * pdpr);
     pctx.fillStyle = '#ffb347'; pctx.fillText('1-D', L + pw - 30 * pdpr, T + 10 * pdpr);
@@ -1026,15 +1050,36 @@ function main() {
   });
 
   /* ---------------- drag the exit lip to change the area ratio -------------- */
-  const toSim = e => { const r = trail.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * geom.Wd, H2 - (e.clientY - r.top) / r.height * H2]; };
+  const toSim = e => { const r = trail.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top; return [view.vx0 + px / kx, vy0 + (cssH - py) / ky]; };
+  const ptrs = new Map(); let pinch0 = null, lastPan = 0;
+  const viewChanged = () => { view.dirty = true; $('view').value = ['exit', 'noz', 'far', 'full'].includes(view.mode) ? view.mode : $('view').value; };
+  function zoomAt(px, factor) {                         // keep the world point under screen x = px fixed
+    const wx = view.vx0 + px / kx; view.ww = clamp(view.ww / factor, 6, geom.Wd); clampView();
+    view.vx0 = wx - px / (cssW / view.ww); clampView(); view.mode = 'custom'; viewChanged();
+  }
   trail.addEventListener('pointerdown', e => {
+    trail.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); hintOn = false; $('hint').style.opacity = 0;
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); dragging = false; trail.classList.remove('drag'); return; }
     if (geom.type === 'conv') return;
     const [x, y] = toSim(e), px = Math.abs(x - geom.xe) * kx, py = (Math.abs(y - geom.cy) - geom.he) * ky;
-    if (px < 26 && Math.abs(py) < 26) { dragging = true; trail.setPointerCapture(e.pointerId); trail.classList.add('drag'); hintOn = false; $('hint').style.opacity = 0; }
+    if (px < 26 && Math.abs(py) < 26) { dragging = true; trail.classList.add('drag'); }
   });
-  trail.addEventListener('pointermove', e => { if (!dragging) return; const [, y] = toSim(e); setAr(Math.abs(y - geom.cy) / geom.ht); });
-  const endDrag = () => { dragging = false; trail.classList.remove('drag'); };
-  trail.addEventListener('pointerup', endDrag); trail.addEventListener('pointercancel', endDrag);
+  trail.addEventListener('pointermove', e => {
+    const prev = ptrs.get(e.pointerId); if (!prev) return;
+    if (dragging) { const [, y] = toSim(e); setAr(Math.abs(y - geom.cy) / geom.ht); ptrs.set(e.pointerId, [e.clientX, e.clientY]); return; }
+    if (ptrs.size === 2) {
+      ptrs.set(e.pointerId, [e.clientX, e.clientY]); const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (pinch0 && d > 0) { const r = trail.getBoundingClientRect(); zoomAt((a[0] + b[0]) / 2 - r.left, d / pinch0); pinch0 = d; }
+      return;
+    }
+    const dx = e.clientX - prev[0]; ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (dx) { view.vx0 -= dx / kx; clampView(); view.mode = 'custom'; viewChanged(); }
+  });
+  const endPtr = e => { ptrs.delete(e.pointerId); dragging = false; trail.classList.remove('drag'); pinch0 = null; };
+  trail.addEventListener('pointerup', endPtr); trail.addEventListener('pointercancel', endPtr);
+  trail.addEventListener('wheel', e => { e.preventDefault(); const r = trail.getBoundingClientRect(); zoomAt(e.clientX - r.left, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+  trail.addEventListener('dblclick', () => { setViewMode('exit'); viewChanged(); });
+  $('view').onchange = e => setViewMode(e.target.value);
   setTimeout(() => { hintOn = false; $('hint').style.opacity = 0; }, 8000);
 
   let rzT = 0;
@@ -1051,6 +1096,7 @@ function main() {
     const dtMs = Math.min(100, now - lastT); lastT = now;
     if (dtMs > 0) fpsE += (1000 / dtMs - fpsE) * 0.06;
     const w0 = performance.now();
+    if (view.dirty) { view.dirty = false; updateScale(); buildLookup(); streamPath = null; tctx.clearRect(0, 0, trail.width, trail.height); }
     if (geomDirty) applyGeom();
     if (thDirty) applyTheory();
     if (!S.paused) { stepSim(); updateParticles(); }

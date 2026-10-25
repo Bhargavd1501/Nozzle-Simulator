@@ -1,7 +1,7 @@
 /* NozzleLab service worker: offline support after the first visit.
    Network-first (so updates show up), falls back to cache when offline.
    Bump CACHE (v1 -> v2 ...) whenever you upload a new version to force a refresh. */
-const CACHE = 'nozzlelab-v1';
+const CACHE = 'nozzlelab-v2';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {}));
